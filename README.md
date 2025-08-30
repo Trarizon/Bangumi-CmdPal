@@ -1,0 +1,1 @@
+# Trarizon.Bangumi.CommandPalette
