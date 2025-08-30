@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "BangumiExtension (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "BangumiExtension (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
