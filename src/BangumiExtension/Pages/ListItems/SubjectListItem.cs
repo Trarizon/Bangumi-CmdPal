@@ -1,7 +1,9 @@
 ﻿using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using Trarizon.Bangumi.Api.Models.SubjectModels;
+using Trarizon.Bangumi.CommandPalette.Helpers;
 using Trarizon.Bangumi.CommandPalette.Utilities;
+using Trarizon.Library.Functional;
 
 namespace Trarizon.Bangumi.CommandPalette.Pages.ListItems;
 internal sealed partial class SubjectListItem : ListItem
@@ -10,21 +12,38 @@ internal sealed partial class SubjectListItem : ListItem
 
     public SubjectListItem(SearchResponsedSubject subject)
     {
-        Command = new OpenUrlCommand($"https://bgm.tv/subject/{subject.Id}") { Result = CommandResult.Dismiss() };
+        Command = new OpenUrlCommand(BangumiUrls.Subject(subject.Id)) { Result = CommandResult.Dismiss() };
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {
-            (var name, "" or null) => (name, ""),
+            (var name, "") => (name, ""),
             (var name, var cnName) when name == cnName => (name, ""),
             (var name, var cnName) => (cnName, name)
         };
 
         Tags = [subject.Type.ToTag()];
 
-        var details = BangumiHelpers.ToDetails(subject);
-        details.Body = subject.Summary.Length > SummaryTruncateLength
-            ? $"{subject.Summary.AsSpan(..SummaryTruncateLength)}..."
-            : subject.Summary;
-        Details = details;
+        Details = new Details
+        {
+            Title = subject.Name,
+            HeroImage = new IconInfo(subject.Images.Grid),
+            Body = subject.Summary.Length > SummaryTruncateLength
+                ? $"{subject.Summary.AsSpan(..SummaryTruncateLength)}..."
+                : subject.Summary,
+            Metadata = [
+                ..Optional.Of(subject.ChineseName)
+                    .Where(cn => !string.IsNullOrEmpty(cn))
+                    .Select(x => new DetailsElement {
+                        Key = "中文名",
+                        Data = new DetailsLink{ Text = x }
+                    }),
+                new DetailsElement {
+                    Key = "类型",
+                    Data = new DetailsTags {
+                        Tags = [subject.Type.ToTag()]
+                    }
+                },
+            ]
+        };
     }
 }

@@ -1,6 +1,8 @@
-﻿using Microsoft.CommandPalette.Extensions.Toolkit;
+﻿using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Trarizon.Bangumi.Api.Models.EpisodeModels;
@@ -8,6 +10,7 @@ using Trarizon.Bangumi.Api.Models.UserModels;
 using Trarizon.Bangumi.Api.Requests;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
+using Trarizon.Bangumi.CommandPalette.Helpers;
 using Trarizon.Bangumi.CommandPalette.Utilities;
 using Trarizon.Library.Functional;
 
@@ -27,7 +30,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         _cancellationToken = cancellationToken;
         var subject = _collection.Subject;
 
-        Command = new OpenUrlCommand($"https://bgm.tv/subject/{subject.Id}") { Result = CommandResult.Dismiss() };
+        Command = new OpenUrlCommand(BangumiUrls.Subject(subject.Id)) { Result = CommandResult.Dismiss() };
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {
@@ -38,14 +41,37 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
 
         Tags = [subject.Type.ToTag()];
 
-        var details = BangumiHelpers.ToDetails(subject);
-        details.Body = subject.TruncatedSummary;
-        Details = details;
-
+        SetDetails();
         _ = SetMoreCommandsAsync();
     }
 
-    private Optional<Episode> _nextEp;
+    private Episode? _nextEp;
+
+    private void SetDetails()
+    {
+        var subject = _collection.Subject;
+
+        Details = new Details
+        {
+            Title = subject.Name,
+            HeroImage = new IconInfo(subject.Images.Grid),
+            Body = subject.TruncatedSummary,
+            Metadata = [
+                ..Optional.Of(subject.ChineseName)
+                    .Where(cn => !string.IsNullOrEmpty(cn))
+                    .Select(x => new DetailsElement {
+                        Key = "中文名",
+                        Data = new DetailsLink{ Text = x }
+                    }),
+                new DetailsElement {
+                    Key = "类型",
+                    Data = new DetailsTags {
+                        Tags = [subject.Type.ToTag()]
+                    }
+                },
+            ]
+        };
+    }
 
     private async Task SetMoreCommandsAsync()
     {
@@ -63,9 +89,9 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             epCount = (int)fullsubject.TotalEpisodeCount;
         }
         if (_collection.EpisodeStatus < epCount) {
-            var ep = await GetNextEpisodeAsync(_cancellationToken).ConfigureAwait(false);
-            var epName = ep.Name.Length > EpNameTruncateLength ? $"{ep.Name.AsSpan(..EpNameTruncateLength)}..." : ep.Name;
-            var text = $"看过 ep.{ep.Sort} {epName}";
+            var nextEp = await GetNextEpisodeAsync(_cancellationToken).ConfigureAwait(false);
+            var epName = nextEp.Name.Length > EpNameTruncateLength ? $"{nextEp.Name.AsSpan(..EpNameTruncateLength)}..." : nextEp.Name;
+            var text = $"看过 ep.{nextEp.Sort} {epName}";
             item = new CommandContextItem(
                 title: text,
                 subtitle: "",
@@ -82,24 +108,46 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             action: MarkSubjectAsDoneAsyncCallback,
             CommandResult.KeepOpen());
 
-        Debugging.Log($"item is null: {item is null}");
+        var prevEp = await _page.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
+        IContextItem? openEpUrlCommand = null;
+        if (prevEp is not null) {
+            var openEpUrlCommandName = $"打开Ep.{prevEp.Ep}页面";
+            openEpUrlCommand = new CommandContextItem(new OpenUrlCommand(BangumiUrls.Episode(prevEp.Id))
+            {
+                Name = openEpUrlCommandName,
+                Result = CommandResult.Dismiss(),
+            })
+            {
+                Title = openEpUrlCommandName,
+                Subtitle = "",
+            };
+        }
 
-        if (item is null)
-            MoreCommands = [subjectDoneCommand];
-        else
-            MoreCommands = [item, subjectDoneCommand];
+        MoreCommands = [
+            .. Optional.OfNotNull(item),
+            subjectDoneCommand,
+            .. Optional.OfNotNull(openEpUrlCommand),
+        ];
     }
 
+    private async Task ReplaceCollectionAsync(UserSubjectCollection collection)
+    {
+        Debug.Assert(_collection.SubjectId == collection.SubjectId);
+        _collection = collection;
+        _nextEp = null;
+        await SetMoreCommandsAsync().ConfigureAwait(false);
+    }
+    
     private async ValueTask<Episode> GetNextEpisodeAsync(CancellationToken cancellationToken)
     {
-        if (_nextEp.HasValue)
-            return _nextEp.Value;
+        if (_nextEp is not null)
+            return _nextEp;
 
         _nextEp = await _page.Client.GetEpisodes(_collection.SubjectId)
             .ElementAtAsync(_collection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
 
-        Debug.Assert(_nextEp.GetValueOrDefault() is not null);
-        return _nextEp.Value;
+        Debug.Assert(_nextEp is not null);
+        return _nextEp;
     }
 
     private async void DoneAsyncCallback()
@@ -123,10 +171,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             // 重设collection
             var self = await _page.Client.GetSelfAsync(_cancellationToken).ConfigureAwait(false);
             Debug.Assert(self is not null);
-            _collection = await _page.Client.GetUserSubjectCollectionAsync(self.UserName, _collection.SubjectId, _cancellationToken).ConfigureAwait(false);
-            _nextEp = Optional.None;
-
-            await SetMoreCommandsAsync().ConfigureAwait(false);
+            await ReplaceCollectionAsync(await _page.Client.GetUserSubjectCollectionAsync(self.UserName, _collection.SubjectId, _cancellationToken).ConfigureAwait(false));
         }
         catch {
             // TODO: 弹个toast？
