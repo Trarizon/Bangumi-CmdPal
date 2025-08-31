@@ -15,6 +15,7 @@ using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CommandPalette.Helpers;
 using Trarizon.Bangumi.CommandPalette.Pages.ListItems;
 using Trarizon.Bangumi.CommandPalette.Utilities;
+using Trarizon.Library.Functional;
 
 #pragma warning disable BgmExprApi // 类型仅用于评估，在将来的更新中可能会被更改或删除。取消此诊断以继续。
 
@@ -24,7 +25,8 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
 
-    private static IListItem LoginListItem => field ??= new ListItem(new NoOpCommand() { Name = "登录" }) { Title = "登录", Icon = new IconInfo("\uE90F") };
+    private static IListItem HomeListItem => field ??= new ListItem(new OpenUrlCommand(BangumiUrls.Home) { Name = "打开bgm.tv", Result = CommandResult.Dismiss() }) { Title = "打开bgm.tv" };
+    //private static IListItem LoginListItem => field ??= new ListItem(new NoOpCommand() { Name = "登录" }) { Title = "登录", Icon = new IconInfo("\uE90F") };
     private static IListItem HelpListItem => field ??= new ListItem(new HelpPage() { Name = "帮助" }) { Title = "帮助", Icon = new IconInfo("\uE90F") };
     private static IListItem UnauthorizedListItem => field ??= new ListItem(new NoOpCommand() { Name = "未认证" }) { Title = "未认证", Icon = new IconInfo("\uE7BA") };
     private static IListItem NoResultListItem => field ??= new ListItem(new NoOpCommand() { Name = "无搜索结果" }) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
@@ -109,25 +111,23 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         }
     }
 
-    private async ValueTask SetDefaultListItemsAsync()
+    private ValueTask SetDefaultListItemsAsync()
     {
-        List<IListItem> items = [];
         IsLoading = false;
-        items.Add(HelpListItem);
-
-        if (!await Client.IsLoggedInAsync().ConfigureAwait(false)) {
-            items.Add(LoginListItem);
-        }
-
-        Items = items.ToArray();
+        Items = [
+            HomeListItem,
+            HelpListItem,
+            //Optional.Create(!await Client.IsLoggedInAsync().ConfigureAwait(false), LoginListItem),
+        ];
+        return ValueTask.CompletedTask;
     }
 
     private async Task<IListItem[]> SearchForListItemsAsync(string searchKeyword, CancellationToken cancellationToken)
     {
         // Login
-        if (TryGetLoginCommand(searchKeyword, out var login)) {
-            return [LoginListItem];
-        }
+        //if (TryGetLoginCommand(searchKeyword, out var login)) {
+        //    return [LoginListItem];
+        //}
 
         // Check flags
         var search = ParseSearchKeywords(searchKeyword);
@@ -148,7 +148,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         }
         catch (BangumiApiException ex) {
             DebugMessage($"Request Error {ex.Message}");
-            return [new ListItem(new NoOpCommand()) { 
+            return [new ListItem(new NoOpCommand()) {
                 Title = $"Request Error: {ex.Message}",
                 Details = new Details {
                     Body = ex.StackTrace ?? "",
