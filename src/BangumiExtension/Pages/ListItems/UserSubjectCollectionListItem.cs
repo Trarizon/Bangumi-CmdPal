@@ -111,7 +111,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         var prevEp = await _page.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
         IContextItem? openEpUrlCommand = null;
         if (prevEp is not null) {
-            var openEpUrlCommandName = $"打开Ep.{prevEp.Ep}页面";
+            var openEpUrlCommandName = $"打开Ep.{prevEp.Sort}页面";
             openEpUrlCommand = new CommandContextItem(new OpenUrlCommand(BangumiUrls.Episode(prevEp.Id))
             {
                 Name = openEpUrlCommandName,
