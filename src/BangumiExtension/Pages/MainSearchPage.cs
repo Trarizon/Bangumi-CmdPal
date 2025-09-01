@@ -3,7 +3,6 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,14 +24,13 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
 
-    private static IListItem HomeListItem => field ??= new ListItem(new OpenUrlCommand(BangumiUrls.Home) { Name = "打开bgm.tv", Result = CommandResult.Dismiss() }) { Title = "打开bgm.tv" };
-    //private static IListItem LoginListItem => field ??= new ListItem(new NoOpCommand() { Name = "登录" }) { Title = "登录", Icon = new IconInfo("\uE90F") };
-    private static IListItem HelpListItem => field ??= new ListItem(new HelpPage() { Name = "帮助" }) { Title = "帮助", Icon = new IconInfo("\uE90F") };
-    private static IListItem UnauthorizedListItem => field ??= new ListItem(new NoOpCommand() { Name = "未认证" }) { Title = "未认证", Icon = new IconInfo("\uE7BA") };
-    private static IListItem NoResultListItem => field ??= new ListItem(new NoOpCommand() { Name = "无搜索结果" }) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
+    private static IListItem HomeListItem => field ??= new ListItem(BangumiHelpers.OpenHomeUrlCommand()) { Title = "打开Bangumi", Subtitle = BangumiHelpers.HomeUrl };
+    private static IListItem HelpListItem => field ??= new ListItem(new HelpPage()) { Title = "帮助", Icon = new IconInfo("\uE90F") };
+    private static IListItem UnauthorizedListItem => field ??= new ListItem(new NoOpCommand()) { Title = "未认证", Icon = new IconInfo("\uE7BA") };
+    private static IListItem NoResultListItem => field ??= new ListItem(new NoOpCommand()) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
 
     private readonly SettingsManager _settings;
-    private readonly Timer _timer;
+    private Debouncer<string> _debouncer;
     private readonly ResetableCancellationTokenSource _cts = new();
 
     private string _accessToken;
@@ -41,7 +39,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
     public MainSearchPage(SettingsManager settingsManager)
     {
         _settings = settingsManager;
-        _timer = new Timer(_ => UpdateSearchAsyncCallback(), this, Timeout.Infinite, Timeout.Infinite);
+        _debouncer = new(UpdateSearchAsync);
         _accessToken = _settings.AccessToken;
         Client = new AuthorizableBangumiClient(_accessToken);
 
@@ -52,8 +50,6 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         ShowDetails = true;
     }
 
-    private string? _prevSearchKeyword;
-    private string? _searchKeyword;
     private IListItem[] Items { get => field; set { if (field != value) { field = value; RaiseItemsChanged(); } } } = [];
 
     public override IListItem[] GetItems() => Items;
@@ -62,43 +58,31 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
     {
         DebugMessage($"Handle search {oldSearch} -> {newSearch}");
         if (string.IsNullOrWhiteSpace(newSearch)) {
-            _cts.Cancel();
-            _timer.Change(Timeout.Infinite, Timeout.Infinite);
-            _prevSearchKeyword = _searchKeyword;
-            _searchKeyword = "";
-            await SetDefaultListItemsAsync();
+            _debouncer.CancelInvoke();
+            IsLoading = false;
+            Items = await GetDefaultListItemsAsync().ConfigureAwait(false);
             return;
         }
 
-        _searchKeyword = newSearch;
-        _timer.Change(dueTime: _settings.SearchDebounce, Timeout.Infinite);
+        _debouncer.DelayInvoke(newSearch, _settings.SearchDebounce);
     }
 
-    private async void UpdateSearchAsyncCallback()
+    private async Task UpdateSearchAsync(string keyword, CancellationToken cancellationToken)
     {
-        // HACK: 设置里修改access token没有notify，所以每次请求前检查一下
-        // 实现很丑，但是懒得搞了
-        if (_accessToken != _settings.AccessToken) {
-            _accessToken = _settings.AccessToken;
-            Client.Dispose();
-            Client = new AuthorizableBangumiClient(_accessToken);
-            // If we refreshed client, we should re-search although the keyword not changed
-        }
-        else if (_prevSearchKeyword.AsSpan().Trim(' ').SequenceEqual(_searchKeyword.AsSpan().Trim(' '))) {
-            return;
-        }
-        _prevSearchKeyword = _searchKeyword;
-
-        _cts.Cancel();
-        if (string.IsNullOrEmpty(_searchKeyword)) {
-            await SetDefaultListItemsAsync().ConfigureAwait(false);
-            return;
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureClientUpdated();
 
         IsLoading = true;
-        _cts.Reset();
+        var trimmed = keyword.AsSpan().Trim(' ');
         try {
-            Items = await SearchForListItemsAsync(_searchKeyword, _cts.Token).ConfigureAwait(false);
+            var items = new List<IListItem>();
+            items.AddOptional(Optional.Create("help".StartsWith(trimmed), HelpListItem));
+            items.AddOptional(Optional.Create("bgm".StartsWith(trimmed) || "bangumi".StartsWith(trimmed), HomeListItem));
+
+            // 搜索
+            items.AddRange(await SearchForListItemsAsync(keyword, cancellationToken).ConfigureAwait(false));
+
+            Items = items.ToArray();
         }
         catch (OperationCanceledException) {
             return;
@@ -111,15 +95,22 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         }
     }
 
-    private ValueTask SetDefaultListItemsAsync()
+    private async ValueTask<IListItem[]> GetDefaultListItemsAsync() => [
+        HomeListItem,
+        HelpListItem,
+        .. Optional.OfNotNull(await Client.GetSelfAsync().ConfigureAwait(false))
+            .Select(x => new ListItem(BangumiHelpers.OpenUserUrlCommand(x)) { Title = "我的时光机", Subtitle = $"@{x.UserName}" })
+    ];
+
+    private void EnsureClientUpdated()
     {
-        IsLoading = false;
-        Items = [
-            HomeListItem,
-            HelpListItem,
-            //Optional.Create(!await Client.IsLoggedInAsync().ConfigureAwait(false), LoginListItem),
-        ];
-        return ValueTask.CompletedTask;
+        // HACK: 设置里修改access token没有notify，所以每次请求前检查一下
+        // 实现很丑，但是懒得搞了
+        if (_accessToken != _settings.AccessToken) {
+            _accessToken = _settings.AccessToken;
+            Client.Dispose();
+            Client = new AuthorizableBangumiClient(_accessToken);
+        }
     }
 
     private async Task<IListItem[]> SearchForListItemsAsync(string searchKeyword, CancellationToken cancellationToken)
@@ -215,16 +206,6 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         }
     }
 
-    private static bool TryGetLoginCommand(string keyword, [MaybeNullWhen(false)] out IListItem loginListItem)
-    {
-        if ("login".StartsWith(keyword, StringComparison.OrdinalIgnoreCase)) {
-            loginListItem = new ListItem(new NoOpCommand()) { Title = "Login", Icon = new IconInfo("\uE90F") };
-            return true;
-        }
-        loginListItem = null;
-        return false;
-    }
-
     private static SearchOptions ParseSearchKeywords(string inputKeyword)
     {
         // 输入规则：
@@ -293,9 +274,8 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
     // TODO: 我不知道这个什么时候会调用，可能根本不会
     public void Dispose()
     {
-        _timer.Dispose();
-        _cts?.Dispose();
-        Client?.Dispose();
+        _debouncer.Dispose();
+        Client.Dispose();
     }
 
     [Conditional("DEBUG")]

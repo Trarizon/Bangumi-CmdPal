@@ -2,7 +2,6 @@
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Trarizon.Bangumi.Api.Models.EpisodeModels;
@@ -30,7 +29,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         _cancellationToken = cancellationToken;
         var subject = _collection.Subject;
 
-        Command = new OpenUrlCommand(BangumiUrls.Subject(subject.Id)) { Result = CommandResult.Dismiss() };
+        Command = BangumiHelpers.OpenSubjectUrlCommand(subject);
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {
@@ -111,14 +110,9 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         var prevEp = await _page.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
         IContextItem? openEpUrlCommand = null;
         if (prevEp is not null) {
-            var openEpUrlCommandName = $"打开Ep.{prevEp.Sort}页面";
-            openEpUrlCommand = new CommandContextItem(new OpenUrlCommand(BangumiUrls.Episode(prevEp.Id))
+            openEpUrlCommand = new CommandContextItem(BangumiHelpers.OpenEpisodeUrlCommand(prevEp))
             {
-                Name = openEpUrlCommandName,
-                Result = CommandResult.Dismiss(),
-            })
-            {
-                Title = openEpUrlCommandName,
+                Title = $"打开Ep.{prevEp.Sort}页面",
                 Subtitle = "",
             };
         }
@@ -137,7 +131,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         _nextEp = null;
         await SetMoreCommandsAsync().ConfigureAwait(false);
     }
-    
+
     private async ValueTask<Episode> GetNextEpisodeAsync(CancellationToken cancellationToken)
     {
         if (_nextEp is not null)

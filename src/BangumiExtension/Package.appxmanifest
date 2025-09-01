@@ -35,7 +35,7 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Bangumi"
+        DisplayName="Bangumi-CmdPal"
         Description="Bangumi的PowerToys CommandPalette扩展"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"

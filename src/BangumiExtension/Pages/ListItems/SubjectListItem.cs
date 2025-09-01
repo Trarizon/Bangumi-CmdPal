@@ -12,7 +12,7 @@ internal sealed partial class SubjectListItem : ListItem
 
     public SubjectListItem(SearchResponsedSubject subject)
     {
-        Command = new OpenUrlCommand(BangumiUrls.Subject(subject.Id)) { Result = CommandResult.Dismiss() };
+        Command = BangumiHelpers.OpenSubjectUrlCommand(subject);
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {
