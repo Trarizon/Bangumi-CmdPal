@@ -8,14 +8,16 @@ internal sealed partial class Debouncer<T> : IDisposable
 {
     private readonly Timer _timer;
     private readonly Func<T, CancellationToken, Task> _callback;
+    private readonly CancellationToken _externalCancellationToken;
     private readonly ResettableCancellationTokenSource _cts = new();
     private readonly Lock _lock = new();
 
     private T _currentValue = default!;
 
-    public Debouncer(Func<T, CancellationToken, Task> callback)
+    public Debouncer(Func<T, CancellationToken, Task> callback, CancellationToken cancellationToken = default)
     {
         _callback = callback;
+        _externalCancellationToken = cancellationToken;
         _timer = new Timer(TimerCallback, null, Timeout.Infinite, Timeout.Infinite);
     }
 
@@ -38,7 +40,16 @@ internal sealed partial class Debouncer<T> : IDisposable
 
     private void TimerCallback(object? state)
     {
-        _callback(_currentValue, _cts.Token);
+        CancellationToken ct;
+        if (_externalCancellationToken == default) {
+            ct = _cts.Token;
+        }
+        else {
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(_externalCancellationToken, _cts.Token);
+            ct = cts.Token;
+        }
+
+        _callback(_currentValue, ct);
     }
 
     public void Dispose()

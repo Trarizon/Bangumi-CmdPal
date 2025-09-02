@@ -1,5 +1,4 @@
-﻿using Microsoft.CommandPalette.Extensions;
-using Microsoft.CommandPalette.Extensions.Toolkit;
+﻿using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -41,7 +40,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         Tags = [subject.Type.ToTag()];
 
         SetDetails();
-        _ = SetMoreCommandsAsync();
+        _ = SetMoreCommandsAsync(_cancellationToken);
     }
 
     private Episode? _nextEp;
@@ -72,7 +71,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         };
     }
 
-    private async Task SetMoreCommandsAsync()
+    private async Task SetMoreCommandsAsync(CancellationToken cancellationToken)
     {
         // 已看完
         if (_collection.Type is not SubjectCollectionType.Doing) {
@@ -80,7 +79,15 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             return;
         }
 
-        CommandContextItem? item = null;
+        MoreCommands = [
+            .. Optional.OfNotNull(await GetMarkNextEpisodeDoneCommandItemAsync(cancellationToken).ConfigureAwait(false)),
+            GetMarkSubjectAsDoneCommandItem(),
+            .. Optional.OfNotNull(await GetOpenEpisodeUrlCommandItemAsync(cancellationToken).ConfigureAwait(false)),
+        ];
+    }
+
+    private async Task<CommandContextItem?> GetMarkNextEpisodeDoneCommandItemAsync(CancellationToken cancellationToken)
+    {
         var epCount = _collection.Subject.EpisodeCount;
         if (epCount == 0) {
             // wiki中没有值，从数据库获取
@@ -91,60 +98,17 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             var nextEp = await GetNextEpisodeAsync(_cancellationToken).ConfigureAwait(false);
             var epName = nextEp.Name.Length > EpNameTruncateLength ? $"{nextEp.Name.AsSpan(..EpNameTruncateLength)}..." : nextEp.Name;
             var text = $"看过 ep.{nextEp.Sort} {epName}";
-            item = new CommandContextItem(
+            return new CommandContextItem(
                 title: text,
                 subtitle: "",
                 name: text,
-                action: DoneAsyncCallback,
+                action: MarkNextEpisodeDoneAsyncCallback,
                 CommandResult.KeepOpen());
         }
-
-        var subjectDoneCommandName = $"标记为{SubjectCollectionType.Collect.ToDisplayString(_collection.SubjectType)}";
-        var subjectDoneCommand = new CommandContextItem(
-            title: subjectDoneCommandName,
-            subtitle: "",
-            name: subjectDoneCommandName,
-            action: MarkSubjectAsDoneAsyncCallback,
-            CommandResult.KeepOpen());
-
-        var prevEp = await _page.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
-        IContextItem? openEpUrlCommand = null;
-        if (prevEp is not null) {
-            openEpUrlCommand = new CommandContextItem(BangumiHelpers.OpenEpisodeUrlCommand(prevEp))
-            {
-                Title = $"打开Ep.{prevEp.Sort}页面",
-                Subtitle = "",
-            };
-        }
-
-        MoreCommands = [
-            .. Optional.OfNotNull(item),
-            subjectDoneCommand,
-            .. Optional.OfNotNull(openEpUrlCommand),
-        ];
+        return null;
     }
 
-    private async Task ReplaceCollectionAsync(UserSubjectCollection collection)
-    {
-        Debug.Assert(_collection.SubjectId == collection.SubjectId);
-        _collection = collection;
-        _nextEp = null;
-        await SetMoreCommandsAsync().ConfigureAwait(false);
-    }
-
-    private async ValueTask<Episode> GetNextEpisodeAsync(CancellationToken cancellationToken)
-    {
-        if (_nextEp is not null)
-            return _nextEp;
-
-        _nextEp = await _page.Client.GetEpisodes(_collection.SubjectId)
-            .ElementAtAsync(_collection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
-
-        Debug.Assert(_nextEp is not null);
-        return _nextEp;
-    }
-
-    private async void DoneAsyncCallback()
+    private async void MarkNextEpisodeDoneAsyncCallback()
     {
         var cmdItem = (CommandContextItem)MoreCommands[0];
         cmdItem.Title = "API请求中...";
@@ -172,6 +136,17 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         }
     }
 
+    private CommandContextItem GetMarkSubjectAsDoneCommandItem()
+    {
+        var subjectDoneCommandName = $"标记为{SubjectCollectionType.Collect.ToDisplayString(_collection.SubjectType)}";
+        return new CommandContextItem(
+            title: subjectDoneCommandName,
+            subtitle: "",
+            name: subjectDoneCommandName,
+            action: MarkSubjectAsDoneAsyncCallback,
+            CommandResult.KeepOpen());
+    }
+
     private async void MarkSubjectAsDoneAsyncCallback()
     {
         try {
@@ -180,10 +155,43 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
                 Type = SubjectCollectionType.Collect,
             }, _cancellationToken).ConfigureAwait(false);
 
-            await SetMoreCommandsAsync().ConfigureAwait(false);
+            await SetMoreCommandsAsync(_cancellationToken).ConfigureAwait(false);
         }
         catch (Exception) {
             // TODO: 弹个toast？
         }
+    }
+
+    private async Task<CommandContextItem?> GetOpenEpisodeUrlCommandItemAsync(CancellationToken cancellationToken)
+    {
+        var prevEp = await _page.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
+        if (prevEp is not null) {
+            return new CommandContextItem(BangumiHelpers.OpenEpisodeUrlCommand(prevEp))
+            {
+                Title = $"打开Ep.{prevEp.Sort}页面",
+                Subtitle = "",
+            };
+        }
+        return null;
+    }
+
+    private async Task ReplaceCollectionAsync(UserSubjectCollection collection)
+    {
+        Debug.Assert(_collection.SubjectId == collection.SubjectId);
+        _collection = collection;
+        _nextEp = null;
+        await SetMoreCommandsAsync(_cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<Episode> GetNextEpisodeAsync(CancellationToken cancellationToken)
+    {
+        if (_nextEp is not null)
+            return _nextEp;
+
+        _nextEp = await _page.Client.GetEpisodes(_collection.SubjectId)
+            .ElementAtAsync(_collection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
+
+        Debug.Assert(_nextEp is not null);
+        return _nextEp;
     }
 }

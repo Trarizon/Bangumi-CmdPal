@@ -50,7 +50,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         ShowDetails = true;
     }
 
-    private IListItem[] Items { get => field; set { if (field != value) { field = value; RaiseItemsChanged(); } } } = [];
+    private IListItem[] Items { get => field; set { field = value; RaiseItemsChanged(value.Length); } } = [];
 
     public override IListItem[] GetItems() => Items;
 
