@@ -8,7 +8,7 @@ internal sealed partial class Debouncer<T> : IDisposable
 {
     private readonly Timer _timer;
     private readonly Func<T, CancellationToken, Task> _callback;
-    private readonly ResetableCancellationTokenSource _cts = new();
+    private readonly ResettableCancellationTokenSource _cts = new();
     private readonly Lock _lock = new();
 
     private T _currentValue = default!;

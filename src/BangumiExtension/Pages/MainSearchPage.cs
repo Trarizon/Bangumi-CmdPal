@@ -31,7 +31,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
     private readonly SettingsManager _settings;
     private Debouncer<string> _debouncer;
-    private readonly ResetableCancellationTokenSource _cts = new();
+    private readonly ResettableCancellationTokenSource _cts = new();
 
     private string _accessToken;
     public AuthorizableBangumiClient Client { get; private set; }

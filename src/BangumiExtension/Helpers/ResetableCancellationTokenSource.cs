@@ -2,7 +2,7 @@
 using System.Threading;
 
 namespace Trarizon.Bangumi.CommandPalette.Utilities;
-internal sealed partial class ResetableCancellationTokenSource : IDisposable
+internal sealed partial class ResettableCancellationTokenSource : IDisposable
 {
     private CancellationTokenSource _source = new();
     private readonly Lock _lock = new();
