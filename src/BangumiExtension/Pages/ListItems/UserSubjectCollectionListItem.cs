@@ -67,6 +67,17 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
                         Tags = [subject.Type.ToTag()]
                     }
                 },
+                new DetailsElement {
+                    Key = "评分",
+                    Data = new DetailsTags {
+                        Tags = [
+                            new Tag($"{subject.Score}"),
+                            .. Optional.Of(_collection.Rate)
+                                .Where(x => x > 0)
+                                .Select(x => new Tag($"我的给分: {x}")),
+                        ]
+                    }
+                },
             ]
         };
     }

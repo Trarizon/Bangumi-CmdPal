@@ -43,6 +43,10 @@ internal sealed partial class SubjectListItem : ListItem
                         Tags = [subject.Type.ToTag()]
                     }
                 },
+                new DetailsElement {
+                    Key = "评分",
+                    Data = new DetailsLink { Text = $"{subject.Rating.Score}", }
+                },
             ]
         };
     }
