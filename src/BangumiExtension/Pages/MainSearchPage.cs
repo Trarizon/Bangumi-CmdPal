@@ -196,6 +196,9 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
         async Task<IListItem[]> Core(string keyword, int page, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(keyword))
+                return [];
+            
             var subjects = await Client.SearchPagedSubjectsAsync(new SearchSubjectsRequestBody
             {
                 Keyword = keyword,
