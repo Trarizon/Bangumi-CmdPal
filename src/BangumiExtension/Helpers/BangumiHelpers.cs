@@ -1,7 +1,7 @@
 ﻿using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using Trarizon.Bangumi.Api.Models.Abstractions;
-using Trarizon.Bangumi.Api.Models.EpisodeModels;
+using Trarizon.Bangumi.Api.Responses.Models;
+using Trarizon.Bangumi.Api.Responses.Models.Abstractions;
 
 namespace Trarizon.Bangumi.CommandPalette.Helpers;
 internal static class BangumiHelpers

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Trarizon.Bangumi.Api;
 using Trarizon.Bangumi.Api.Exceptions;
-using Trarizon.Bangumi.Api.Models.UserModels;
+using Trarizon.Bangumi.Api.Responses.Models.Users;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Library.Functional;
 

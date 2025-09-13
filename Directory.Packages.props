@@ -14,7 +14,7 @@
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
     <PackageVersion Include="System.Linq.Async" Version="6.0.3" />
     <PackageVersion Include="System.Text.Json" Version="9.0.5" />
-    <PackageVersion Include="Trarizon.Bangumi.Api" Version="0.0.0.5" />
+    <PackageVersion Include="Trarizon.Bangumi.Api" Version="0.0.0.6" />
     <PackageVersion Include="Trarizon.Library.Functional" Version="1.0.1" />
   </ItemGroup>
 </Project>

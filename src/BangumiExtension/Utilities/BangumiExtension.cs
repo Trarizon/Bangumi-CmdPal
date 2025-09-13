@@ -3,8 +3,8 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Trarizon.Bangumi.Api.Models.SubjectModels;
-using Trarizon.Bangumi.Api.Models.UserModels;
+using Trarizon.Bangumi.Api.Responses.Models;
+using Trarizon.Bangumi.Api.Responses.Models.Collections;
 
 namespace Trarizon.Bangumi.CommandPalette.Utilities;
 internal static class BangumiExtension

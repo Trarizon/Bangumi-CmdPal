@@ -3,9 +3,9 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Trarizon.Bangumi.Api.Models.EpisodeModels;
-using Trarizon.Bangumi.Api.Models.UserModels;
 using Trarizon.Bangumi.Api.Requests;
+using Trarizon.Bangumi.Api.Responses.Models;
+using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CommandPalette.Helpers;
@@ -62,16 +62,11 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
                         Data = new DetailsLink{ Text = x }
                     }),
                 new DetailsElement {
-                    Key = "类型",
-                    Data = new DetailsTags {
-                        Tags = [subject.Type.ToTag()]
-                    }
-                },
-                new DetailsElement {
-                    Key = "评分",
+                    Key = "信息",
                     Data = new DetailsTags {
                         Tags = [
-                            new Tag($"{subject.Score}"),
+                            subject.Type.ToTag(),
+                            new Tag($"评分: {subject.Score}"),
                             .. Optional.Of(_collection.Rate)
                                 .Where(x => x > 0)
                                 .Select(x => new Tag($"我的给分: {x}")),
