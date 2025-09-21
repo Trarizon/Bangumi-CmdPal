@@ -13,6 +13,7 @@ using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CommandPalette.Helpers;
+using Trarizon.Bangumi.CommandPalette.Helpers.Searching;
 using Trarizon.Bangumi.CommandPalette.Pages.ListItems;
 using Trarizon.Bangumi.CommandPalette.Utilities;
 using Trarizon.Library.Functional;
@@ -25,14 +26,14 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
 
-    private static IListItem HomeListItem => field ??= new ListItem(BangumiHelpers.OpenHomeUrlCommand()) { Title = "打开Bangumi", Subtitle = BangumiHelpers.HomeUrl };
-    private static IListItem HelpListItem => field ??= new ListItem(new HelpPage()) { Title = "帮助", Icon = new IconInfo("\uE90F") };
+    private static IListItem HomeListItem { get; } = new ListItem(BangumiHelpers.OpenHomeUrlCommand()) { Title = "打开Bangumi", Subtitle = BangumiHelpers.HomeUrl };
+    private static IListItem HelpListItem { get; } = new ListItem(new HelpPage()) { Title = "帮助", Icon = new IconInfo("\uE90F") };
 
     private static ICommandItem UnauthorizedCommandItem => field ??= new CommandItem(new NoOpCommand()) { Title = "未认证", Icon = new IconInfo("\uE7BA") };
     private static ICommandItem NoResultCommandItem => field ??= new CommandItem(new NoOpCommand()) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
 
     private readonly SettingsManager _settings;
-    private readonly Debouncer<string> _debouncer;
+    private readonly Debouncer<SearchOptions> _debouncer;
     private readonly ResettableCancellationTokenSource _cts = new();
 
     private string _accessToken;
@@ -41,7 +42,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
     public MainSearchPage(SettingsManager settingsManager)
     {
         _settings = settingsManager;
-        _debouncer = new(UpdateSearchAsync);
+        _debouncer = new();
         _accessToken = _settings.AccessToken;
         Client = new AuthorizableBangumiClient(_accessToken);
 
@@ -52,58 +53,106 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         ShowDetails = true;
     }
 
-    private IListItem[] Items { get => field; set { field = value; RaiseItemsChanged(value.Length); } } = [];
+    private IListItem[] Items { get => field; set { if (field != value) { field = value; RaiseItemsChanged(value.Length); } } } = [];
 
     public override IListItem[] GetItems() => Items;
 
     public override async void UpdateSearchText(string oldSearch, string newSearch)
     {
-        DebugMessage($"Handle search {oldSearch} -> {newSearch}");
+        Debugging.Log($"Handle search {oldSearch} -> {newSearch}");
         if (string.IsNullOrWhiteSpace(newSearch)) {
             _debouncer.CancelInvoke();
-            IsLoading = false;
+            IsLoading = true;
             Items = await GetDefaultListItemsAsync().ConfigureAwait(false);
-            return;
-        }
-
-        _debouncer.DelayInvoke(newSearch, _settings.SearchDebounce);
-    }
-
-    private async Task UpdateSearchAsync(string keyword, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        EnsureClientUpdated();
-
-        IsLoading = true;
-        var trimmed = keyword.AsSpan().Trim(' ');
-        try {
-            var search = await SearchForListItemsAsync(keyword, cancellationToken).ConfigureAwait(false);
-            if (search.TryGetValue(out var items, out var empty)) {
-                Items = items;
-                EmptyContent = null;
-            }
-            else {
-                Items = [];
-                EmptyContent = empty;
-            }
-        }
-        catch (OperationCanceledException) {
-            return;
-        }
-        catch {
-            DebugMessage("Error from searching");
-        }
-        finally {
             IsLoading = false;
+            return;
+        }
+
+        Debugging.Log($"Auto search: {_settings.AutoSearch}");
+        if (_settings.AutoSearch) {
+            AutoSearchHandler(newSearch);
+        }
+        else {
+            IsLoading = false;
+            var searchOptions = SearchOptions.Parse(newSearch);
+            Items = [
+                GetSearchListItem(searchOptions,_cts.Token),
+                .. Optional.Create(newSearch.EndsWith(" :", StringComparison.Ordinal), searchOptions)
+                    .Match(opt => GetTextSuggestions(opt), () => [])
+            ];
         }
     }
 
-    private async ValueTask<IListItem[]> GetDefaultListItemsAsync() => [
-        HomeListItem,
-        HelpListItem,
-        .. Optional.OfNotNull(await Client.GetSelfAsync().ConfigureAwait(false))
-            .Select(x => new ListItem(BangumiHelpers.OpenUserUrlCommand(x)) { Title = "我的时光机", Subtitle = $"@{x.UserName}" })
-    ];
+    private void AutoSearchHandler(string search)
+    {
+        var options = SearchOptions.Parse(search);
+        if (search.EndsWith(" :", StringComparison.Ordinal)) {
+            _cts.Cancel();
+            Items = GetTextSuggestions(options);
+            IsLoading = false;
+            return;
+        }
+
+        _debouncer.DelayInvoke(options, async (options, cancellationToken) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureClientUpdated();
+
+            using (this.EnterLoadingScope()) {
+                var result = await SearchForListItemsAsync(options, cancellationToken).ConfigureAwait(false);
+                result.Match(
+                    items => (Items, EmptyContent) = (items, null),
+                    empty => (Items, EmptyContent) = ([], empty));
+            }
+        }, _settings.SearchDebounce, _cts.Token);
+    }
+
+    private async ValueTask<IListItem[]> GetDefaultListItemsAsync()
+    {
+        var self = await Client.GetSelfAsync().ConfigureAwait(false);
+        return [
+            HomeListItem,
+            HelpListItem,
+            .. Optional.OfNotNull(self)
+                .Select(self => new ListItem(BangumiHelpers.OpenUserUrlCommand(self)) { Title = "我的时光机", Subtitle = $"@{self.UserName}" })
+        ];
+    }
+
+    private ListItem GetSearchListItem(SearchOptions searchOptions, CancellationToken cancellationToken)
+    {
+        return new ListItem(new AnonymousCommand(async () =>
+        {
+            using (this.EnterLoadingScope()) {
+                var res = await SearchForListItemsAsync(searchOptions, cancellationToken).ConfigureAwait(false);
+                res.Match(
+                    items => { EmptyContent = null; Items = items; },
+                    item => { EmptyContent = item; Items = []; });
+            }
+        })
+        {
+            Result = CommandResult.KeepOpen(),
+        })
+        {
+            Icon = new IconInfo("\uE721"),
+            Title = searchOptions.Me
+                ? $"搜索在看作品: {searchOptions.Keywords}"
+                : $"搜索 {searchOptions.Keywords}",
+        };
+    }
+
+    private static IListItem[] GetTextSuggestions(SearchOptions searchOptions)
+    {
+        var suggestions = new List<IListItem>();
+        return searchOptions.GetUnsetOptions()
+            .Select(info => new ListItem()
+            {
+                Icon = new IconInfo("\uE713"),
+                Title = $":{info.Option}",
+                Subtitle = info.Description,
+                TextToSuggest = searchOptions.InputString + info.Option
+            })
+            .ToArray();
+    }
 
     private void EnsureClientUpdated()
     {
@@ -116,29 +165,21 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         }
     }
 
-    private async Task<Result<IListItem[], ICommandItem>> SearchForListItemsAsync(string searchKeyword, CancellationToken cancellationToken)
+    private async Task<Result<IListItem[], ICommandItem>> SearchForListItemsAsync(SearchOptions searchOptions, CancellationToken cancellationToken)
     {
-        // Login
-        //if (TryGetLoginCommand(searchKeyword, out var login)) {
-        //    return [LoginListItem];
-        //}
-
-        // Check flags
-        var search = SearchOptions.Parse(searchKeyword);
-
-        DebugMessage($"Searching '{search.Keywords}' ({search.Page} {_settings.SearchCount}){(search.Me ? " :me" : null)}");
-
-        // Search
         try {
-            if (search.Me) {
-                var res = await CoreForUserCollection(search.Keywords.ToString(), 
-                    search.SubjectTypes.Count == 0 ? null : search.SubjectTypes[0], 
-                    search.Page, cancellationToken).ConfigureAwait(false);
+            if (searchOptions.Me) {
+                var res = await CoreForUserCollection(searchOptions.Keywords.ToString(),
+                    searchOptions.SubjectTypes is [var first, ..] ? first : null,
+                    searchOptions.Page, cancellationToken)
+                    .ConfigureAwait(false);
                 return res.ToResult(UnauthorizedCommandItem)
-                    .Bind<IListItem[]>(arr => arr is [] ? Result.Error(NoResultCommandItem) : Result.Success(arr));
+                    .Bind(arr => Result.Create(arr is not [], arr, NoResultCommandItem));
             }
             else {
-                return Optional.Of(await Core(search.Keywords.ToString(), search.SubjectTypes, search.Page, cancellationToken).ConfigureAwait(false))
+                return Optional.Of(await Core(searchOptions.Keywords.ToString(),
+                    searchOptions.SubjectTypes,
+                    searchOptions.Page, cancellationToken).ConfigureAwait(false))
                     .Where(x => x is not [])
                     .ToResult(NoResultCommandItem);
             }
@@ -168,7 +209,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
         async Task<Optional<IListItem[]>> CoreForUserCollection(string keyword, SubjectType? type, int page, CancellationToken cancellationToken)
         {
-            var self = await Client.GetSelfAsync(_cts.Token).ConfigureAwait(false);
+            var self = await Client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
             if (self is null) {
                 return default;
             }
@@ -180,25 +221,26 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                     pageLimit: _settings.SearchCount,
                     pageOffset: page * _settings.SearchCount,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
+                Debugging.Log(string.Join("\n", collections.Datas.Select(x => $"{x.Subject.Name} - {x.Subject.ChineseName}")));
                 return collections.Datas
                     .Select(col => new UserSubjectCollectionListItem(this, col, cancellationToken))
                     .ToArray();
             }
 
-            Debugging.Log("----- Search Keyword: " + keyword + " -----\n");
+            Debugging.Log($"----- Search collection '{keyword}', page {page}, take {_settings.SearchCount} -----\n");
             return await Client.GetUserSubjectCollections(self.UserName,
                 subjectType: type,
                 collectionType: SubjectCollectionType.Doing,
                 options: new() { RequestInterval = TimeSpan.FromMilliseconds(AsyncPageCollectionRequestInterval) })
                 .Where(x =>
                 {
-                    Debugging.Log($"{x.Subject.Name} - {x.Subject.ChineseName}\n");
+                    Debugging.Log($"{x.Subject.Name} - {x.Subject.ChineseName}");
                     return x.Subject.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                         || x.Subject.ChineseName.Contains(keyword, StringComparison.OrdinalIgnoreCase);
                 })
-                .Select(collection => new UserSubjectCollectionListItem(this, collection, cancellationToken))
-                .Skip(page)
+                .Skip(page * _settings.SearchCount)
                 .Take(_settings.SearchCount)
+                .Select(collection => new UserSubjectCollectionListItem(this, collection, cancellationToken))
                 .ToArrayAsync(cancellationToken).ConfigureAwait(false);
         }
 

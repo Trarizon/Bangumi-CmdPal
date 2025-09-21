@@ -16,6 +16,7 @@ internal sealed class SettingsManager : JsonSettingsManager
         Settings.Add(_accessToken);
         Settings.Add(_searchDebounce);
         Settings.Add(_searchCount);
+        Settings.Add(_autoSearch);
 
         LoadSettings();
         Settings.SettingsChanged += (s, e) => SaveSettings();
@@ -40,7 +41,7 @@ internal sealed class SettingsManager : JsonSettingsManager
     private readonly TextSetting _searchDebounce = new(
         Namespaced(nameof(SearchDebounce)),
         "搜索防抖时间",
-        "在搜索框键入后到执行搜索的等待时间，这可以避免在快速键入时执行不必要的搜索请求。",
+        "在搜索框键入后到执行搜索的等待时间，这可以避免在快速键入时执行不必要的搜索请求",
         "250");
 
     private readonly TextSetting _searchCount = new(
@@ -49,9 +50,17 @@ internal sealed class SettingsManager : JsonSettingsManager
         "单次显示的搜索结果数量",
         "10");
 
+    private readonly ToggleSetting _autoSearch = new(
+        Namespaced(nameof(AutoSearch)),
+        "自动触发搜索",
+        "键入字符一定时间后自动触发搜索",
+        true);
+
     public string AccessToken => _accessToken.Value ?? "";
 
     public int SearchDebounce => int.TryParse(_searchDebounce.Value, out var val) ? val : 250;
 
     public int SearchCount => int.TryParse(_searchCount.Value, out var val) ? val : 10;
+
+    public bool AutoSearch => _autoSearch.Value;
 }

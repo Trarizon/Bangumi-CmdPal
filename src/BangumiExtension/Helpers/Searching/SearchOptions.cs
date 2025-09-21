@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using Trarizon.Bangumi.Api.Responses.Models;
+using Trarizon.Bangumi.CommandPalette.Utilities;
 
-namespace Trarizon.Bangumi.CommandPalette.Helpers;
-internal readonly ref struct SearchOptions(ReadOnlySpan<char> keyword)
+namespace Trarizon.Bangumi.CommandPalette.Helpers.Searching;
+public readonly struct SearchOptions(string input, Range keywordRange)
 {
-    public ReadOnlySpan<char> Keywords { get; } = keyword;
+    public string InputString => input;
+    public ReadOnlySpan<char> Keywords => input.AsSpan(keywordRange);
     public bool Me { get; init; }
     public int Page { get; init; }
     public required List<SubjectType> SubjectTypes { get; init; }
 
-    public static SearchOptions Parse(ReadOnlySpan<char> input)
+    public static SearchOptions Parse(string rawInput)
     {
         // 输入规则：
         // 以空格分割，':'开头为选项，其他为值
@@ -19,6 +21,7 @@ internal readonly ref struct SearchOptions(ReadOnlySpan<char> keyword)
         // :opt :a search keywords: example :trailing data :>>
         // ^ option                         ^option        ^option
         //         ^ search keywords                  ^ignored
+        var input = rawInput.AsSpan();
 
         int kwstart = -1;
         int kwend = -1;
@@ -55,14 +58,15 @@ internal readonly ref struct SearchOptions(ReadOnlySpan<char> keyword)
             }
         }
 
-        var kw = (kwstart, kwend) switch
+
+        var ofs = (kwstart, kwend) switch
         {
-            ( < 0, _) => [],
-            (_, < 0) => input[kwstart..].TrimEnd(),
-            (_, _) => input[kwstart..kwend].TrimEnd(),
+            ( < 0, _) => 0..0,
+            (_, < 0) => Utils.OffsetOf(input, input[kwstart..].TrimEnd()),
+            (_, _) => Utils.OffsetOf(input, input[kwstart..kwend].TrimEnd()),
         };
 
-        return new SearchOptions(kw)
+        return new SearchOptions(rawInput, ofs)
         {
             Me = me,
             Page = page,
@@ -95,6 +99,13 @@ internal readonly ref struct SearchOptions(ReadOnlySpan<char> keyword)
             }
             subjectType = default;
             return false;
+        }
+    }
+
+    public IEnumerable<SearchOptionInfo> GetUnsetOptions()
+    {
+        if (!Me) {
+            yield return new("me", "搜索用户在看列表");
         }
     }
 }

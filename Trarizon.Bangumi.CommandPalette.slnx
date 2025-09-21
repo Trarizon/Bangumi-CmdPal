@@ -14,4 +14,9 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
+  <Project Path="tests/BangumiExtension.Test/BangumiExtension.Test.csproj" Id="046e554e-0643-4186-b96d-8bf15041c209">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Platform Solution="*|x86" Project="x64" />
+  </Project>
 </Solution>
