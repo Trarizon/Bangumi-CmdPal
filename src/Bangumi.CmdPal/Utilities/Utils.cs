@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trarizon.Library.Functional;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal static class Utils
 {
     public static Range OffsetOf<T>(ReadOnlySpan<T> source, ReadOnlySpan<T> slice)

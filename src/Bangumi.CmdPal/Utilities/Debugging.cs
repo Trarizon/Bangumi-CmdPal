@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.IO;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal static class Debugging
 {
     [Conditional("DEBUG")]

@@ -1,8 +1,10 @@
 ﻿using Microsoft.CommandPalette.Extensions.Toolkit;
+using System;
 using System.IO;
+using Windows.Foundation;
 using ToolkitUtilities = Microsoft.CommandPalette.Extensions.Toolkit.Utilities;
 
-namespace Trarizon.Bangumi.CommandPalette.Helpers;
+namespace Trarizon.Bangumi.CmdPal.Helpers;
 internal sealed class SettingsManager : JsonSettingsManager
 {
     // Reference: https://github.com/microsoft/PowerToys/blob/main/src/modules/cmdpal/ext/Microsoft.CmdPal.Ext.Calc/Helper/SettingsManager.cs#L84
@@ -19,8 +21,14 @@ internal sealed class SettingsManager : JsonSettingsManager
         Settings.Add(_autoSearch);
 
         LoadSettings();
-        Settings.SettingsChanged += (s, e) => SaveSettings();
+        Settings.SettingsChanged += (s, e) =>
+        {
+            SaveSettings();
+            SettingsChanged?.Invoke(this);
+        };
     }
+
+    public event Action<SettingsManager>? SettingsChanged;
 
     private static string Namespaced(string key) => $"{Namespace}.{key}";
 

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal sealed partial class ResettableCancellationTokenSource : IDisposable
 {
     private CancellationTokenSource _source = new();

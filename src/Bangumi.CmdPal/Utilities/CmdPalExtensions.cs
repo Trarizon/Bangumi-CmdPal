@@ -1,7 +1,7 @@
 ﻿using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal static class CmdPalExtensions
 {
     public static PageLoadingScope EnterLoadingScope(this Page page) => new(page);

@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal sealed partial class Debouncer<T> : IDisposable
 {
     private readonly Timer _timer;

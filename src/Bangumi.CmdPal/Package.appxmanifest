@@ -9,7 +9,7 @@
   IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
-    Name="BangumiExtension"
+    Name="Bangumi.CmdPal"
     Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
     Version="0.0.1.0" />
   <!-- When you're ready to publish your extension, you'll need to change the
@@ -46,7 +46,7 @@
       <Extensions>
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:ExeServer Executable="BangumiExtension.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Bangumi">
+            <com:ExeServer Executable="Bangumi.CmdPal.exe" Arguments="-RegisterProcessAsComServer" DisplayName="Bangumi">
               <com:Class Id="7fa53814-bb18-4520-a2d7-912f7235d9a7" DisplayName="Bangumi" />
             </com:ExeServer>
           </com:ComServer>

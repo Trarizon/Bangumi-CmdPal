@@ -8,7 +8,7 @@ using Trarizon.Bangumi.Api.Responses.Models.Users;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Library.Functional;
 
-namespace Trarizon.Bangumi.CommandPalette.Utilities;
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 internal sealed partial class AuthorizableBangumiClient : IBangumiClient, IDisposable
 {
     private const string UserAgent = "Trarizon/Trarizon.Bangumi.CommandPalette";

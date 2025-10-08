@@ -4,24 +4,30 @@
 
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using Trarizon.Bangumi.CommandPalette.Helpers;
-using Trarizon.Bangumi.CommandPalette.Pages;
+using System;
+using Trarizon.Bangumi.CmdPal.Core;
+using Trarizon.Bangumi.CmdPal.Helpers;
+using Trarizon.Bangumi.CmdPal.Pages;
 
-namespace Trarizon.Bangumi.CommandPalette;
+namespace Trarizon.Bangumi.CmdPal;
 
-public partial class BangumiExtensionCommandsProvider : CommandProvider
+public sealed partial class BangumiExtensionCommandsProvider : CommandProvider, IDisposable
 {
     private static readonly SettingsManager _settingsManager = new();
 
     private readonly ICommandItem[] _commands;
+    private readonly MainPage _mainPage;
+
+    private readonly BangumiExtensionContext _context;
 
     public BangumiExtensionCommandsProvider()
     {
         DisplayName = "Bangumi";
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Settings = _settingsManager.Settings;
+        _context = new(_settingsManager);
         _commands = [
-            new CommandItem(new MainSearchPage(_settingsManager)) {
+            new CommandItem(_mainPage = new MainPage(_context)) {
                 Title = DisplayName,
                 Subtitle = "搜索、记录Bangumi条目信息",
                 MoreCommands = [
@@ -36,4 +42,9 @@ public partial class BangumiExtensionCommandsProvider : CommandProvider
         return _commands;
     }
 
+    public override void Dispose()
+    {
+        base.Dispose();
+        _mainPage.Dispose();
+    }
 }

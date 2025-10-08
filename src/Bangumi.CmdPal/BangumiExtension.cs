@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.CommandPalette.Extensions;
 
-namespace Trarizon.Bangumi.CommandPalette;
+namespace Trarizon.Bangumi.CmdPal;
 
 [Guid("7fa53814-bb18-4520-a2d7-912f7235d9a7")]
 public sealed partial class BangumiExtension : IExtension, IDisposable

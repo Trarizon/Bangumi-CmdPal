@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>Trarizon.Bangumi.CommandPalette</RootNamespace>
+    <RootNamespace>Trarizon.Bangumi.CmdPal</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <WindowsSdkPackageVersion>10.0.22621.57</WindowsSdkPackageVersion>
-    <TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>
+    <WindowsSdkPackageVersion>10.0.26100.68-preview</WindowsSdkPackageVersion>
+    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
@@ -39,15 +39,15 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CommandPalette.Extensions" />
-    <PackageReference Include="Microsoft.Windows.CsWinRT" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" />
-    <PackageReference Include="Microsoft.Web.WebView2" />
-    <PackageReference Include="System.Linq.Async" />
-    <PackageReference Include="System.Text.Json" />
-    <PackageReference Include="Shmuelie.WinRTServer" />
-    <PackageReference Include="Trarizon.Bangumi.Api" />
-    <PackageReference Include="Trarizon.Library.Functional" />
+      <PackageReference Include="Microsoft.CommandPalette.Extensions" />
+      <PackageReference Include="Microsoft.Windows.CsWinRT" />
+      <PackageReference Include="Microsoft.WindowsAppSDK" />
+      <PackageReference Include="Microsoft.Web.WebView2" />
+      <PackageReference Include="System.Linq.Async" />
+      <PackageReference Include="System.Text.Json" />
+      <PackageReference Include="Shmuelie.WinRTServer" />
+      <PackageReference Include="Trarizon.Bangumi.Api" />
+      <PackageReference Include="Trarizon.Library.Functional" />
   </ItemGroup>
 
   <!--

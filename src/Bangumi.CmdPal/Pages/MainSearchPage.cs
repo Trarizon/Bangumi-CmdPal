@@ -12,16 +12,17 @@ using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
-using Trarizon.Bangumi.CommandPalette.Helpers;
-using Trarizon.Bangumi.CommandPalette.Helpers.Searching;
-using Trarizon.Bangumi.CommandPalette.Pages.ListItems;
-using Trarizon.Bangumi.CommandPalette.Utilities;
+using Trarizon.Bangumi.CmdPal.Core;
+using Trarizon.Bangumi.CmdPal.Helpers;
+using Trarizon.Bangumi.CmdPal.Helpers.Searching;
+using Trarizon.Bangumi.CmdPal.Pages.ListItems;
+using Trarizon.Bangumi.CmdPal.Utilities;
 using Trarizon.Library.Functional;
 
 #pragma warning disable BgmExprApi // 类型仅用于评估，在将来的更新中可能会被更改或删除。取消此诊断以继续。
 
-namespace Trarizon.Bangumi.CommandPalette.Pages;
-
+namespace Trarizon.Bangumi.CmdPal.Pages;
+[Obsolete("No longer used, remaining for reference")]
 internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
@@ -32,25 +33,36 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
     private static ICommandItem UnauthorizedCommandItem => field ??= new CommandItem(new NoOpCommand()) { Title = "未认证", Icon = new IconInfo("\uE7BA") };
     private static ICommandItem NoResultCommandItem => field ??= new CommandItem(new NoOpCommand()) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
 
-    private readonly SettingsManager _settings;
+    private readonly BangumiExtensionContext _context;
+    private SettingsManager _settings => _context.Settings;
     private readonly Debouncer<SearchOptions> _debouncer;
     private readonly ResettableCancellationTokenSource _cts = new();
 
     private string _accessToken;
-    public AuthorizableBangumiClient Client { get; private set; }
+    public AuthorizableBangumiClient Client => _context.Client;
 
-    public MainSearchPage(SettingsManager settingsManager)
+    public MainSearchPage(BangumiExtensionContext context)
     {
-        _settings = settingsManager;
+        _context = context;
+
         _debouncer = new();
         _accessToken = _settings.AccessToken;
-        Client = new AuthorizableBangumiClient(_accessToken);
 
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Title = "Bangumi";
         Name = "Bangumi";
         PlaceholderText = "键入以搜索条目";
         ShowDetails = true;
+
+        Filters = new Filt();
+    }
+
+    public partial class Filt : Filters
+    {
+        public override IFilterItem[] GetFilters() => [
+            new Filter{Id="all",Name="All"},
+            new Filter{Id="me",Name="ME"},
+            ];
     }
 
     private IListItem[] Items { get => field; set { if (field != value) { field = value; RaiseItemsChanged(value.Length); } } } = [];
@@ -96,7 +108,6 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         _debouncer.DelayInvoke(options, async (options, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EnsureClientUpdated();
 
             using (this.EnterLoadingScope()) {
                 var result = await SearchForListItemsAsync(options, cancellationToken).ConfigureAwait(false);
@@ -152,17 +163,6 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                 TextToSuggest = searchOptions.InputString + info.Option
             })
             .ToArray();
-    }
-
-    private void EnsureClientUpdated()
-    {
-        // HACK: 设置里修改access token没有notify，所以每次请求前检查一下
-        // 实现很丑，但是懒得搞了
-        if (_accessToken != _settings.AccessToken) {
-            _accessToken = _settings.AccessToken;
-            Client.Dispose();
-            Client = new AuthorizableBangumiClient(_accessToken);
-        }
     }
 
     private async Task<Result<IListItem[], ICommandItem>> SearchForListItemsAsync(SearchOptions searchOptions, CancellationToken cancellationToken)
@@ -223,7 +223,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                     cancellationToken: cancellationToken).ConfigureAwait(false);
                 Debugging.Log(string.Join("\n", collections.Datas.Select(x => $"{x.Subject.Name} - {x.Subject.ChineseName}")));
                 return collections.Datas
-                    .Select(col => new UserSubjectCollectionListItem(this, col, cancellationToken))
+                    .Select(col => new UserSubjectCollectionListItem(_context, col, cancellationToken))
                     .ToArray();
             }
 
@@ -240,7 +240,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                 })
                 .Skip(page * _settings.SearchCount)
                 .Take(_settings.SearchCount)
-                .Select(collection => new UserSubjectCollectionListItem(this, collection, cancellationToken))
+                .Select(collection => new UserSubjectCollectionListItem(_context, collection, cancellationToken))
                 .ToArrayAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -258,7 +258,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                 }
             }, _settings.SearchCount, page * _settings.SearchCount, cancellationToken).ConfigureAwait(false);
             return subjects.Datas
-                .Select(x => new SubjectListItem(Client, x, cancellationToken))
+                .Select(x => new SubjectListItem(_context, x, cancellationToken))
                 .ToArray();
         }
     }

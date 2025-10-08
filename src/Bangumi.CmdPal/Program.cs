@@ -9,7 +9,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Trarizon.Bangumi.CommandPalette;
+namespace Trarizon.Bangumi.CmdPal;
 
 public class Program
 {

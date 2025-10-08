@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using Trarizon.Bangumi.Api.Responses.Models;
-using Trarizon.Bangumi.CommandPalette.Utilities;
+using Trarizon.Bangumi.CmdPal.Utilities;
 
-namespace Trarizon.Bangumi.CommandPalette.Helpers.Searching;
+namespace Trarizon.Bangumi.CmdPal.Helpers.Searching;
 public readonly struct SearchOptions(string input, Range keywordRange)
 {
     public string InputString => input;

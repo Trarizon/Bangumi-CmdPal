@@ -7,7 +7,7 @@ using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Abstractions;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
 
-namespace Trarizon.Bangumi.CommandPalette.Helpers;
+namespace Trarizon.Bangumi.CmdPal.Helpers;
 internal static class BangumiHelpers
 {
     public const string HomeUrl = "https://bgm.tv";
@@ -26,6 +26,8 @@ internal static class BangumiHelpers
     {
         Result = CommandResult.Dismiss(),
     };
+
+    public static string UserUrl(IUserNamed user) => $"https://bgm.tv/user/{user.UserName}";
 
     public static ICommand OpenUserUrlCommand(IUserNamed user) => new OpenUrlCommand($"https://bgm.tv/user/{user.UserName}")
     {

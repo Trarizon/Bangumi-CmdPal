@@ -1,7 +1,7 @@
 ﻿using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
-namespace Trarizon.Bangumi.CommandPalette.Pages;
+namespace Trarizon.Bangumi.CmdPal.Pages;
 internal sealed partial class HelpPage : ContentPage
 {
     private readonly MarkdownContent _content;
