@@ -91,7 +91,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
                     pageLimit: _context.Settings.SearchCount,
                     pageOffset: 0,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
-
+                
                 Debugging.Log("Handle empty search done");
 
                 var result = collections.Datas

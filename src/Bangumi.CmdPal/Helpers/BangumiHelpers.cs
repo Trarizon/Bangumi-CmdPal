@@ -12,6 +12,10 @@ internal static class BangumiHelpers
 {
     public const string HomeUrl = "https://bgm.tv";
 
+    public static string SubjectUrl(ISubjectIdentity subject) => $"https://bgm.tv/subject/{subject.Id}";
+    public static string EpisodeUrl(Episode episode) => $"https://bgm.tv/ep/{episode.Id}";
+    public static string UserUrl(IUserNamed user) => $"https://bgm.tv/user/{user.UserName}";
+
     public static ICommand OpenHomeUrlCommand() => new OpenUrlCommand(HomeUrl)
     {
         Result = CommandResult.Dismiss(),
@@ -27,7 +31,6 @@ internal static class BangumiHelpers
         Result = CommandResult.Dismiss(),
     };
 
-    public static string UserUrl(IUserNamed user) => $"https://bgm.tv/user/{user.UserName}";
 
     public static ICommand OpenUserUrlCommand(IUserNamed user) => new OpenUrlCommand($"https://bgm.tv/user/{user.UserName}")
     {
@@ -43,11 +46,11 @@ internal static class BangumiHelpers
         if (!exists) {
             val = subjectType switch
             {
-                SubjectType.Book => new Tag("书籍") { Icon = new IconInfo("\uE82D") },
-                SubjectType.Anime => new Tag("动画") { Icon = new IconInfo("\uE7F4") },
-                SubjectType.Music => new Tag("音乐") { Icon = new IconInfo("\uE8D6") },
-                SubjectType.Game => new Tag("游戏") { Icon = new IconInfo("\uE7FC") },
-                SubjectType.Real => new Tag("三次元") { Icon = new IconInfo("\uE77B") },
+                SubjectType.Book => new Tag("书籍") { Icon = CmdPalFactory.Icon("\uE82D") },
+                SubjectType.Anime => new Tag("动画") { Icon = CmdPalFactory.Icon("\uE7F4") },
+                SubjectType.Music => new Tag("音乐") { Icon = CmdPalFactory.Icon("\uE8D6") },
+                SubjectType.Game => new Tag("游戏") { Icon = CmdPalFactory.Icon("\uE7FC") },
+                SubjectType.Real => new Tag("三次元") { Icon = CmdPalFactory.Icon("\uE77B") },
                 _ => throw new SwitchExpressionException(subjectType),
             };
         }

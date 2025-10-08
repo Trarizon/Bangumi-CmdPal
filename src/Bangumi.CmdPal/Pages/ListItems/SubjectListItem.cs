@@ -27,7 +27,11 @@ internal sealed partial class SubjectListItem : ListItem
         _subject = subject;
         _cancellationToken = cancellationToken;
 
-        Command = BangumiHelpers.OpenSubjectUrlCommand(subject);
+        Command = new OpenUrlCommand(BangumiHelpers.SubjectUrl(subject))
+        {
+            Name = "打开条目页",
+            Result = CommandResult.Dismiss(),
+        };
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {

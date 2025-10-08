@@ -10,7 +10,10 @@ using Trarizon.Bangumi.CmdPal.Utilities;
 namespace Trarizon.Bangumi.CmdPal.Pages;
 internal sealed partial class MainPage : ListPage, IDisposable
 {
-    private static readonly IListItem HomeListItem = new ListItem(new OpenUrlCommand(BangumiHelpers.HomeUrl) { Result = CommandResult.Dismiss() })
+    private static readonly IListItem HomeListItem = new ListItem(new OpenUrlCommand(BangumiHelpers.HomeUrl)
+    {
+        Result = CommandResult.Dismiss()
+    })
     {
         Title = "打开Bangumi",
         Subtitle = BangumiHelpers.HomeUrl,
@@ -74,7 +77,10 @@ internal sealed partial class MainPage : ListPage, IDisposable
             _collectionListItem.Title = "我的时光机";
             _collectionListItem.Subtitle = $"@{self.UserName}";
             _collectionListItem.MoreCommands = [
-                new CommandContextItem(new OpenUrlCommand(BangumiHelpers.UserUrl(self))) {
+                new CommandContextItem(new OpenUrlCommand(BangumiHelpers.UserUrl(self)){
+                    Name = "打开我的时光机",
+                    Result = CommandResult.Dismiss(),
+                }) {
                     Title = "打开我的时光机",
                 }
             ];

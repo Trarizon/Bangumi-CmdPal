@@ -1,8 +1,9 @@
-﻿using Trarizon.Bangumi.CmdPal.Helpers;
+﻿using System;
+using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Utilities;
 
 namespace Trarizon.Bangumi.CmdPal.Core;
-internal sealed class BangumiExtensionContext
+internal sealed partial class BangumiExtensionContext : IDisposable
 {
     private string _accessToken;
 
@@ -24,5 +25,10 @@ internal sealed class BangumiExtensionContext
 
         _accessToken = settings.AccessToken;
         Client = new AuthorizableBangumiClient(_accessToken);
+    }
+
+    public void Dispose()
+    {
+        Client.Dispose();
     }
 }

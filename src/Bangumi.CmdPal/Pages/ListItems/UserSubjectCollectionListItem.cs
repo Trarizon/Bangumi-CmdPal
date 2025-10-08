@@ -29,7 +29,11 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         _cancellationToken = cancellationToken;
         var subject = _collection.Subject;
 
-        Command = BangumiHelpers.OpenSubjectUrlCommand(subject);
+        Command = new OpenUrlCommand(BangumiHelpers.SubjectUrl(subject))
+        {
+            Name = "打开条目页",
+            Result = CommandResult.Dismiss(),
+        };
 
         (Title, Subtitle) = (subject.Name, subject.ChineseName) switch
         {

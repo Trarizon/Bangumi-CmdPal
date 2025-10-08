@@ -5,9 +5,6 @@ using System.Runtime.InteropServices;
 namespace Trarizon.Bangumi.CmdPal.Helpers;
 internal static class CmdPalFactory
 {
-    private static NoOpCommand _noOpCommand = new NoOpCommand();
-    public static NoOpCommand NoOpCommand() => _noOpCommand;
-
     private static CommandResult _keepOpenResult = CommandResult.KeepOpen();
     public static CommandResult KeepOpenResult() => _keepOpenResult;
 

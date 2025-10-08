@@ -46,5 +46,6 @@ public sealed partial class BangumiExtensionCommandsProvider : CommandProvider, 
     {
         base.Dispose();
         _mainPage.Dispose();
+        _context.Dispose();
     }
 }
