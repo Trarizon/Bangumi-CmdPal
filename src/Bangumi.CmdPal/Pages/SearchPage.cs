@@ -14,6 +14,7 @@ using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Utilities;
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
+
 internal partial class SearchPage : DynamicListPage, IDisposable
 {
     public SearchPage(BangumiExtensionContext context)
@@ -124,7 +125,7 @@ internal partial class SearchPage : DynamicListPage, IDisposable
         return await _context.Client.SearchPagedSubjectsAsync(new()
         {
             Keyword = searchText,
-        }, _context.Settings.SearchCount, searchPage * _context.Settings.SearchCount, cancellationToken).ConfigureAwait(false);
+        }, new(_context.Settings.SearchCount, searchPage * _context.Settings.SearchCount), cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()

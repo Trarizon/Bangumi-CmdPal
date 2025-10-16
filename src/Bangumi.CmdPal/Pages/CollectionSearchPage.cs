@@ -13,6 +13,7 @@ using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Utilities;
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
+
 internal partial class CollectionSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
@@ -80,7 +81,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
     {
         using (this.EnterLoadingScope()) {
 
-            var self = await _context.Client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
+            var self = await _context.Client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
             if (self is null)
                 return;
 
@@ -88,10 +89,9 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
                 Debugging.Log("Handle empty search");
                 var collections = await _context.Client.GetPagedUserSubjectCollectionsAsync(self.UserName,
                     collectionType: SubjectCollectionType.Doing,
-                    pageLimit: _context.Settings.SearchCount,
-                    pageOffset: 0,
+                    pagination: new(_context.Settings.SearchCount),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
-                
+
                 Debugging.Log("Handle empty search done");
 
                 var result = collections.Datas
@@ -102,8 +102,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
             }
             else {
                 var result = await _context.Client.GetUserSubjectCollections(self.UserName,
-                    collectionType: SubjectCollectionType.Doing,
-                    options: new() { RequestInterval = TimeSpan.FromMilliseconds(AsyncPageCollectionRequestInterval) })
+                    collectionType: SubjectCollectionType.Doing)
                     .Where(x =>
                     {
                         return x.Subject.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)

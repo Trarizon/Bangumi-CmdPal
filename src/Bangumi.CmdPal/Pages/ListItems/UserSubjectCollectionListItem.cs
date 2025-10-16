@@ -3,7 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Trarizon.Bangumi.Api.Requests;
+using Trarizon.Bangumi.Api.Requests.Payloads;
 using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
@@ -138,7 +138,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             }).ConfigureAwait(false);
 
             // 重设collection
-            var self = await _context.Client.GetSelfAsync(_cancellationToken).ConfigureAwait(false);
+            var self = await _context.Client.GetAuthorizationAsync(_cancellationToken).ConfigureAwait(false);
             Debug.Assert(self is not null);
             await ReplaceCollectionAsync(await _context.Client.GetUserSubjectCollectionAsync(self.UserName, _collection.SubjectId, _cancellationToken).ConfigureAwait(false));
         }

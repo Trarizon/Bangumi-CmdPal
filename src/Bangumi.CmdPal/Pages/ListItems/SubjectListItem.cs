@@ -83,7 +83,7 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async Task SetMoreCommandsAsync(CancellationToken cancellationToken)
     {
-        var self = await _context.Client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
+        var self = await _context.Client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
         if (self is null)
             return;
 

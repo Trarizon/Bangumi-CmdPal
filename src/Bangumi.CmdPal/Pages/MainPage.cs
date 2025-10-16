@@ -64,7 +64,7 @@ internal sealed partial class MainPage : ListPage, IDisposable
         _collectionListItem.Title = "认证中...";
         _collectionListItem.Icon = CmdPalFactory.Icon("\uE90F");
 
-        var self = await _context.Client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
+        var self = await _context.Client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
         if (self is null) {
             _collectionListItem.Title = "Access Token未认证";
             _collectionListItem.Icon = CmdPalFactory.Icon("\uE90F");

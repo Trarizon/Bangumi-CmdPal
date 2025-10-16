@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Trarizon.Bangumi.Api.Exceptions;
 using Trarizon.Bangumi.Api.Requests;
+using Trarizon.Bangumi.Api.Requests.Payloads;
 using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
@@ -22,6 +23,7 @@ using Trarizon.Library.Functional;
 #pragma warning disable BgmExprApi // 类型仅用于评估，在将来的更新中可能会被更改或删除。取消此诊断以继续。
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
+
 [Obsolete("No longer used, remaining for reference")]
 internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 {
@@ -120,7 +122,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
     private async ValueTask<IListItem[]> GetDefaultListItemsAsync()
     {
-        var self = await Client.GetSelfAsync().ConfigureAwait(false);
+        var self = await Client.GetAuthorizationAsync().ConfigureAwait(false);
         return [
             HomeListItem,
             HelpListItem,
@@ -209,7 +211,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
         async Task<Optional<IListItem[]>> CoreForUserCollection(string keyword, SubjectType? type, int page, CancellationToken cancellationToken)
         {
-            var self = await Client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
+            var self = await Client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
             if (self is null) {
                 return default;
             }
@@ -218,8 +220,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                 var collections = await Client.GetPagedUserSubjectCollectionsAsync(self.UserName,
                     subjectType: type,
                     collectionType: SubjectCollectionType.Doing,
-                    pageLimit: _settings.SearchCount,
-                    pageOffset: page * _settings.SearchCount,
+                    pagination: new(_settings.SearchCount, page * _settings.SearchCount),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
                 Debugging.Log(string.Join("\n", collections.Datas.Select(x => $"{x.Subject.Name} - {x.Subject.ChineseName}")));
                 return collections.Datas
@@ -230,8 +231,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
             Debugging.Log($"----- Search collection '{keyword}', page {page}, take {_settings.SearchCount} -----\n");
             return await Client.GetUserSubjectCollections(self.UserName,
                 subjectType: type,
-                collectionType: SubjectCollectionType.Doing,
-                options: new() { RequestInterval = TimeSpan.FromMilliseconds(AsyncPageCollectionRequestInterval) })
+                collectionType: SubjectCollectionType.Doing)
                 .Where(x =>
                 {
                     Debugging.Log($"{x.Subject.Name} - {x.Subject.ChineseName}");
@@ -256,7 +256,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                 {
                     Types = types,
                 }
-            }, _settings.SearchCount, page * _settings.SearchCount, cancellationToken).ConfigureAwait(false);
+            }, new(_settings.SearchCount, page * _settings.SearchCount), cancellationToken).ConfigureAwait(false);
             return subjects.Datas
                 .Select(x => new SubjectListItem(_context, x, cancellationToken))
                 .ToArray();

@@ -9,24 +9,25 @@ using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Library.Functional;
 
 namespace Trarizon.Bangumi.CmdPal.Utilities;
+
 internal sealed partial class AuthorizableBangumiClient : IBangumiClient, IDisposable
 {
     private const string UserAgent = "Trarizon/Trarizon.Bangumi.CommandPalette";
 
-    private BangumiClient _client;
+    private readonly BangumiHttpClient _client;
     private Optional<UserSelf?> _self;
-    public AuthorizableBangumiClient(string? accessToken=null)
+
+    public AuthorizableBangumiClient(string? accessToken = null)
     {
-        _client = new BangumiClient(UserAgent, accessToken);
+        _client = new BangumiHttpClient(UserAgent, accessToken);
     }
 
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
-            => _client.SendAsync(request, cancellationToken);
+    {
+        return _client.SendAsync(request, cancellationToken);
+    }
 
-    public async ValueTask<bool> IsLoggedInAsync(CancellationToken cancellationToken = default)
-        => await GetSelfAsync(cancellationToken).ConfigureAwait(false) is not null;
-
-    public async ValueTask<UserSelf?> GetSelfAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<UserSelf?> GetAuthorizationAsync(CancellationToken cancellationToken = default)
     {
         if (_self.TryGetValue(out var value))
             return value;
@@ -34,7 +35,7 @@ internal sealed partial class AuthorizableBangumiClient : IBangumiClient, IDispo
         try {
             _self = await _client.GetSelfAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (BangumiApiException) {
+        catch (BangumiApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized) {
             _self = null;
         }
         return _self.Value;
