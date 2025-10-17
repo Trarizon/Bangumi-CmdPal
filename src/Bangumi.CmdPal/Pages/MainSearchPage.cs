@@ -1,4 +1,6 @@
-﻿using Microsoft.CommandPalette.Extensions;
+﻿#if false
+
+using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
 using System.Collections.Generic;
@@ -73,7 +75,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
 
     public override async void UpdateSearchText(string oldSearch, string newSearch)
     {
-        Debugging.Log($"Handle search {oldSearch} -> {newSearch}");
+        //Debugging.Log($"Handle search {oldSearch} -> {newSearch}");
         if (string.IsNullOrWhiteSpace(newSearch)) {
             _debouncer.CancelInvoke();
             IsLoading = true;
@@ -82,7 +84,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
             return;
         }
 
-        Debugging.Log($"Auto search: {_settings.AutoSearch}");
+        //Debugging.Log($"Auto search: {_settings.AutoSearch}");
         if (_settings.AutoSearch) {
             AutoSearchHandler(newSearch);
         }
@@ -222,19 +224,19 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
                     collectionType: SubjectCollectionType.Doing,
                     pagination: new(_settings.SearchCount, page * _settings.SearchCount),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
-                Debugging.Log(string.Join("\n", collections.Datas.Select(x => $"{x.Subject.Name} - {x.Subject.ChineseName}")));
+                //Debugging.Log(string.Join("\n", collections.Datas.Select(x => $"{x.Subject.Name} - {x.Subject.ChineseName}")));
                 return collections.Datas
                     .Select(col => new UserSubjectCollectionListItem(_context, col, cancellationToken))
                     .ToArray();
             }
 
-            Debugging.Log($"----- Search collection '{keyword}', page {page}, take {_settings.SearchCount} -----\n");
+            //Debugging.Log($"----- Search collection '{keyword}', page {page}, take {_settings.SearchCount} -----\n");
             return await Client.GetUserSubjectCollections(self.UserName,
                 subjectType: type,
                 collectionType: SubjectCollectionType.Doing)
                 .Where(x =>
                 {
-                    Debugging.Log($"{x.Subject.Name} - {x.Subject.ChineseName}");
+                    //Debugging.Log($"{x.Subject.Name} - {x.Subject.ChineseName}");
                     return x.Subject.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                         || x.Subject.ChineseName.Contains(keyword, StringComparison.OrdinalIgnoreCase);
                 })
@@ -276,3 +278,5 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         Title = message;
     }
 }
+
+#endif

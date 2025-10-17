@@ -1,38 +1,21 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Microsoft.Extensions.Logging;
+using ZLogger;
+
 Console.WriteLine("Hello, World!");
 
-var list = Enumerable.Range(0, 100).ToAsyncEnumerable()
-    .Select(x => { Console.WriteLine(x); return x; })
-    .CacheEnumerated();
-
-await list.Take(5).ToArrayAsync();
-await list.Take(10).ToArrayAsync();
-await list.Take(15).ToArrayAsync();
-
-
-internal static class EnumerableExtensions
+using var factory = LoggerFactory.Create(builder =>
 {
-    /// <remarks>
-    /// The method is not thread-safe. Use it carefully.
-    /// </remarks>
-    public static IAsyncEnumerable<T> CacheEnumerated<T>(this IAsyncEnumerable<T> source)
-        => new CacheEnumeratedAsyncEnumerable<T>(source);
-
-    private sealed class CacheEnumeratedAsyncEnumerable<T>(IAsyncEnumerable<T> source) : IAsyncEnumerable<T>
+    builder.SetMinimumLevel(LogLevel.Trace);
+    builder.AddZLoggerConsole(options =>
     {
-        private readonly IAsyncEnumerator<T> _enumerator = source.GetAsyncEnumerator();
-        private readonly List<T> _cache = new();
-
-        public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        options.UsePlainTextFormatter(formatter =>
         {
-            foreach (var item in _cache) {
-                yield return item;
-            }
+            formatter.SetPrefixFormatter(
+                $"{0:yyyy-MM-dd HH:mm:ss} [{1}] {2,-11} ",
+                (in template, in info) => template.Format(info.Timestamp, info.Category, info.LogLevel));
+        });
+    });
+});
 
-            while (await _enumerator.MoveNextAsync(cancellationToken).ConfigureAwait(false)) {
-                _cache.Add(_enumerator.Current);
-                yield return _enumerator.Current;
-            }
-        }
-    }
-}
+var logger = factory.CreateLogger("Cat");

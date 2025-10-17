@@ -1,5 +1,6 @@
 ﻿using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using System.Threading;
@@ -12,6 +13,7 @@ using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Pages.Filters;
 using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Utilities;
+using ZLogger;
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
 
@@ -24,6 +26,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
     public CollectionSearchPage(BangumiExtensionContext context)
     {
         _context = context;
+        _logger = _context.CreateLogger("collection search");
 
         Title = "我的时光机";
         PlaceholderText = "键入以搜索时光机条目";
@@ -48,6 +51,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
     }
 
     private readonly BangumiExtensionContext _context;
+    private readonly ILogger _logger;
     private readonly ResettableCancellationTokenSource _cts = new();
 
     private readonly IListItem[] _searchHintListItems;
@@ -115,13 +119,14 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
                 return;
 
             if (string.IsNullOrWhiteSpace(searchText)) {
-                Debugging.Log("Handle empty search");
+                _logger.ZLogTrace($"Search empty");
+
                 var collections = await _context.Client.GetPagedUserSubjectCollectionsAsync(self.UserName,
                     collectionType: collectionType,
                     pagination: new(_context.Settings.SearchCount),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                Debugging.Log("Handle empty search done");
+                _logger.ZLogTrace($"Search empty done");
 
                 var result = collections.Datas
                     .Select(col => new UserSubjectCollectionListItem(_context, col, cancellationToken))

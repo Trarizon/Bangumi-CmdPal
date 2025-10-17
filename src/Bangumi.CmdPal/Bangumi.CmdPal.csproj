@@ -48,6 +48,7 @@
       <PackageReference Include="Shmuelie.WinRTServer" />
       <PackageReference Include="Trarizon.Bangumi.Api" />
       <PackageReference Include="Trarizon.Library.Functional" />
+      <PackageReference Include="ZLogger" />
   </ItemGroup>
 
   <!--

@@ -1,5 +1,6 @@
 ﻿using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +17,7 @@ using Trarizon.Bangumi.CmdPal.Pages.Filters;
 using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Utilities;
 using Trarizon.Library.Functional;
+using ZLogger;
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
 
@@ -27,6 +29,7 @@ internal partial class SubjectSearchPage : DynamicListPage, IDisposable
     public SubjectSearchPage(BangumiExtensionContext context)
     {
         _context = context;
+        _logger = _context.CreateLogger("subject search");
 
         Title = "搜索条目";
         PlaceholderText = "键入以搜索条目";
@@ -52,6 +55,7 @@ internal partial class SubjectSearchPage : DynamicListPage, IDisposable
     }
 
     private readonly BangumiExtensionContext _context;
+    private readonly ILogger _logger;
     private readonly ResettableCancellationTokenSource _cts = new();
 
     private readonly IListItem[] _searchListItems;
@@ -142,12 +146,12 @@ internal partial class SubjectSearchPage : DynamicListPage, IDisposable
             _searchResults = result
                 .Select(x =>
                 {
-                    Debugging.Log($"enumerated in search infinite: {x.Name}");
+                    _logger.ZLogTrace($"Enumerate search result: {x.Name}");
                     return new SubjectListItem(_context, x, cancellationToken);
                 })
                 .CacheEnumerated();
 
-            Debugging.Log($"enumerated in search infinite done, total count: {_searchResultCount}");
+            _logger.ZLogTrace($"Searched '{searchText}', count: {_searchResultCount}");
             var items = await _searchResults.Take(_context.Settings.SearchCount).ToArrayAsync(_cts.Token).ConfigureAwait(false);
             SetItems(items, items.Length < _searchResultCount);
         }

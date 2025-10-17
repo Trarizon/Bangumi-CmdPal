@@ -42,7 +42,12 @@ internal sealed partial class MainPage : ListPage, IDisposable
         };
         _ = SetSelfInfoAsync(_cts.Token);
 
-        _items = [HomeListItem, HelpListItem, _searchListItem, _collectionListItem];
+        _items = [
+            _searchListItem,
+            _collectionListItem,
+            HomeListItem,
+            HelpListItem,
+        ];
     }
 
     private readonly BangumiExtensionContext _context;

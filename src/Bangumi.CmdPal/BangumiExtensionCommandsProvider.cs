@@ -4,10 +4,13 @@
 
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
 using Trarizon.Bangumi.CmdPal.Core;
 using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Pages;
+using ZLogger;
 
 namespace Trarizon.Bangumi.CmdPal;
 

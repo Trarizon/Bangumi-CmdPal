@@ -16,5 +16,6 @@
     <PackageVersion Include="System.Text.Json" Version="9.0.5" />
     <PackageVersion Include="Trarizon.Bangumi.Api" Version="0.0.0.8" />
     <PackageVersion Include="Trarizon.Library.Functional" Version="1.0.2" />
+    <PackageVersion Include="ZLogger" Version="2.5.10" />
   </ItemGroup>
 </Project>
