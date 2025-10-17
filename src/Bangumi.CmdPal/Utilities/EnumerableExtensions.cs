@@ -1,14 +1,9 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
-var list = Enumerable.Range(0, 100).ToAsyncEnumerable()
-    .Select(x => { Console.WriteLine(x); return x; })
-    .CacheEnumerated();
-
-await list.Take(5).ToArrayAsync();
-await list.Take(10).ToArrayAsync();
-await list.Take(15).ToArrayAsync();
-
+namespace Trarizon.Bangumi.CmdPal.Utilities;
 
 internal static class EnumerableExtensions
 {

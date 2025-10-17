@@ -59,7 +59,7 @@ internal sealed partial class MainSearchPage : DynamicListPage, IDisposable
         Filters = new Filt();
     }
 
-    public partial class Filt : Filters
+    public partial class Filt : CmdPalFilters
     {
         public override IFilterItem[] GetFilters() => [
             new Filter{Id="all",Name="All"},

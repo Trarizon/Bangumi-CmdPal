@@ -57,6 +57,26 @@ internal static class BangumiHelpers
         return val!;
     }
 
+    public static IconInfo GetIconInfo(this SubjectType subjectType) => subjectType switch
+    {
+        SubjectType.Book => CmdPalFactory.Icon("\uE82D"),
+        SubjectType.Anime => CmdPalFactory.Icon("\uE7F4"),
+        SubjectType.Music => CmdPalFactory.Icon("\uE8D6"),
+        SubjectType.Game => CmdPalFactory.Icon("\uE7FC"),
+        SubjectType.Real => CmdPalFactory.Icon("\uE77B"),
+        _ => throw new SwitchExpressionException(subjectType),
+    };
+
+    public static string ToDisplayString(this SubjectType subjectType) => subjectType switch
+    {
+        SubjectType.Book => "书籍",
+        SubjectType.Anime => "动画",
+        SubjectType.Music => "音乐",
+        SubjectType.Game => "游戏",
+        SubjectType.Real => "三次元",
+        _ => throw new SwitchExpressionException(subjectType),
+    };
+
     public static string ToDisplayString(this SubjectCollectionType collectionType, SubjectType subjectType) => (collectionType, subjectType) switch
     {
         (SubjectCollectionType.Wish, SubjectType.Book or SubjectType.Anime or SubjectType.Real)
@@ -81,5 +101,4 @@ internal static class BangumiHelpers
         (SubjectCollectionType.Dropped, _) => "抛弃",
         _ => throw new SwitchExpressionException((collectionType, subjectType)),
     };
-
 }

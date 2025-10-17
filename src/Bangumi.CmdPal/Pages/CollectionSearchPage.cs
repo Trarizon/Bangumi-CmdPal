@@ -9,6 +9,7 @@ using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CmdPal.Core;
 using Trarizon.Bangumi.CmdPal.Helpers;
+using Trarizon.Bangumi.CmdPal.Pages.Filters;
 using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Utilities;
 
@@ -18,6 +19,8 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
 {
     private const int AsyncPageCollectionRequestInterval = 100;
 
+    private static readonly ICommandItem NoResultCommandItem = new CommandItem(new NoOpCommand()) { Title = "无搜索结果", Icon = new IconInfo("\uE946") };
+
     public CollectionSearchPage(BangumiExtensionContext context)
     {
         _context = context;
@@ -26,11 +29,11 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
         PlaceholderText = "键入以搜索时光机条目";
         ShowDetails = true;
 
-        _searchListItems = [
-            _searchListItem = new ListItem(new AnonymousCommand(() =>
+        _searchHintListItems = [
+            _searchHintListItem = new ListItem(new AnonymousCommand(() =>
             {
                 _cts.Reset();
-                _ = SearchAsync(_searchText,_cts.Token);
+                _ = SearchAsync(_searchText, SubjectCollectionType.Doing, _cts.Token);
             }){
                 Name = "搜索",
                 Result= CmdPalFactory.KeepOpenResult(),
@@ -39,25 +42,51 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
                 Icon = CmdPalFactory.Icon("\uE721"),
             }
         ];
+
+        EmptyContent = NoResultCommandItem;
+        _items = _searchHintListItems;
     }
 
     private readonly BangumiExtensionContext _context;
     private readonly ResettableCancellationTokenSource _cts = new();
 
-    private readonly IListItem[] _searchListItems;
-    private readonly ListItem _searchListItem;
+    private readonly IListItem[] _searchHintListItems;
+    private readonly ListItem _searchHintListItem;
 
     private string _searchText = "";
 
     #region Items
 
-    private IListItem[] _items = [];
-    public override IListItem[] GetItems() => _items;
-    private void SetItems(IListItem[] items)
+    public override ICommandItem? EmptyContent
     {
-        if (_items == items) return;
-        _items = items;
-        RaiseItemsChanged(items.Length);
+        get => base.EmptyContent;
+        set {
+            if (base.EmptyContent != value) {
+                base.EmptyContent = value;
+            }
+        }
+    }
+
+    public override bool HasMoreItems
+    {
+        get => base.HasMoreItems;
+        set {
+            if (base.HasMoreItems != value) {
+                base.HasMoreItems = value;
+            }
+        }
+    }
+
+    private IListItem[] _items;
+    public override IListItem[] GetItems() => _items;
+    private void SetItems(IListItem[] items, bool hasMoreItems = false)
+    {
+        if (_items != items) {
+            _items = items;
+            RaiseItemsChanged(items.Length);
+        }
+
+        HasMoreItems = hasMoreItems;
     }
 
     #endregion
@@ -67,17 +96,17 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
         if (string.IsNullOrWhiteSpace(newSearch)) {
             _cts.Cancel();
             _searchText = "";
-            _searchListItem.Title = "搜索我的时光机";
-            SetItems(_searchListItems);
+            _searchHintListItem.Title = "搜索我的时光机";
+            SetItems(_searchHintListItems);
             return;
         }
 
         _searchText = newSearch;
-        _searchListItem.Title = $"在我的时光机中搜索: {newSearch}";
-        SetItems(_searchListItems);
+        _searchHintListItem.Title = $"在我的时光机中搜索: {newSearch}";
+        SetItems(_searchHintListItems);
     }
 
-    private async Task SearchAsync(string searchText, CancellationToken cancellationToken)
+    private async Task SearchAsync(string searchText, SubjectCollectionType collectionType, CancellationToken cancellationToken)
     {
         using (this.EnterLoadingScope()) {
 
@@ -88,7 +117,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
             if (string.IsNullOrWhiteSpace(searchText)) {
                 Debugging.Log("Handle empty search");
                 var collections = await _context.Client.GetPagedUserSubjectCollectionsAsync(self.UserName,
-                    collectionType: SubjectCollectionType.Doing,
+                    collectionType: collectionType,
                     pagination: new(_context.Settings.SearchCount),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -102,7 +131,7 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
             }
             else {
                 var result = await _context.Client.GetUserSubjectCollections(self.UserName,
-                    collectionType: SubjectCollectionType.Doing)
+                    collectionType: collectionType)
                     .Where(x =>
                     {
                         return x.Subject.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
@@ -120,18 +149,5 @@ internal partial class CollectionSearchPage : DynamicListPage, IDisposable
     public void Dispose()
     {
         _cts.Dispose();
-    }
-
-    private sealed partial class CollectionTypeFilters : Filters
-    {
-        private readonly Filter[] _filters = [
-            new Filter { Id = "wish", Name = "想看" },
-            new Filter { Id = "doing", Name = "在看" },
-            new Filter { Id = "onhold", Name = "搁置" },
-            new Filter { Id = "collect", Name = "已看" },
-            new Filter { Id = "dropped", Name = "抛弃" },
-        ];
-
-        public override IFilterItem[] GetFilters() => _filters;
     }
 }

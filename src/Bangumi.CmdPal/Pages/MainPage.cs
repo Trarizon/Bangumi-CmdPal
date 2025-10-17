@@ -8,12 +8,10 @@ using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Utilities;
 
 namespace Trarizon.Bangumi.CmdPal.Pages;
+
 internal sealed partial class MainPage : ListPage, IDisposable
 {
-    private static readonly IListItem HomeListItem = new ListItem(new OpenUrlCommand(BangumiHelpers.HomeUrl)
-    {
-        Result = CommandResult.Dismiss()
-    })
+    private static readonly IListItem HomeListItem = new ListItem(new OpenUrlCommand(BangumiHelpers.HomeUrl) { Result = CommandResult.Dismiss() })
     {
         Title = "打开Bangumi",
         Subtitle = BangumiHelpers.HomeUrl,
@@ -33,7 +31,7 @@ internal sealed partial class MainPage : ListPage, IDisposable
             await SetSelfInfoAsync(_cts.Token).ConfigureAwait(false);
         };
 
-        _searchListItem = new ListItem(_searchPage = new SearchPage(_context))
+        _searchListItem = new ListItem(_searchPage = new SubjectSearchPage(_context))
         {
             Title = "搜索条目",
             Icon = CmdPalFactory.Icon("\uE721"),
@@ -51,7 +49,7 @@ internal sealed partial class MainPage : ListPage, IDisposable
     private readonly ResettableCancellationTokenSource _cts = new();
 
     private readonly ListItem _searchListItem;
-    private readonly SearchPage _searchPage;
+    private readonly SubjectSearchPage _searchPage;
     private readonly ListItem _collectionListItem;
     private CollectionSearchPage? _collectionSearchPage;
     private readonly IListItem[] _items;
