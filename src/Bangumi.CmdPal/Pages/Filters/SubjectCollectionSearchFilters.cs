@@ -2,11 +2,11 @@
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
-using Trarizon.Bangumi.CmdPal.Helpers;
+using Trarizon.Bangumi.CmdPal.Toolkit;
 
 namespace Trarizon.Bangumi.CmdPal.Pages.Filters;
 
-internal sealed partial class SubjectCollectionSearchFilters : CmdPalFilters
+internal sealed partial class SubjectCollectionSearchFilters : Microsoft.CommandPalette.Extensions.Toolkit.Filters
 {
     // SubjectCollectionType
     private static readonly IFilterItem[] _filters = [

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Trarizon.Bangumi.Api.Responses.Models;
-using Trarizon.Bangumi.CmdPal.Utilities;
+using Trarizon.Bangumi.CmdPal.Toolkit;
 
 namespace Trarizon.Bangumi.CmdPal.Helpers.Searching;
 public readonly struct SearchOptions(string input, Range keywordRange)
@@ -62,8 +62,8 @@ public readonly struct SearchOptions(string input, Range keywordRange)
         var ofs = (kwstart, kwend) switch
         {
             ( < 0, _) => 0..0,
-            (_, < 0) => Utils.OffsetOf(input, input[kwstart..].TrimEnd()),
-            (_, _) => Utils.OffsetOf(input, input[kwstart..kwend].TrimEnd()),
+            (_, < 0) => Extensions.OffsetOf(input, input[kwstart..].TrimEnd()),
+            (_, _) => Extensions.OffsetOf(input, input[kwstart..kwend].TrimEnd()),
         };
 
         return new SearchOptions(rawInput, ofs)

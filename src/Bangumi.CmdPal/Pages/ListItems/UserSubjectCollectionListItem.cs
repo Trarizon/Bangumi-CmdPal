@@ -1,6 +1,9 @@
-﻿using Microsoft.CommandPalette.Extensions.Toolkit;
+﻿using Microsoft.CommandPalette.Extensions;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Trarizon.Bangumi.Api.Requests.Payloads;
@@ -9,23 +12,24 @@ using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CmdPal.Core;
-using Trarizon.Bangumi.CmdPal.Helpers;
-using Trarizon.Bangumi.CmdPal.Utilities;
+using Trarizon.Bangumi.CmdPal.Toolkit;
 using Trarizon.Library.Functional;
 
 namespace Trarizon.Bangumi.CmdPal.Pages.ListItems;
+
 internal sealed partial class UserSubjectCollectionListItem : ListItem
 {
     private const int EpNameTruncateLength = 12;
 
+    private readonly BangumiClient _client;
+
     private UserSubjectCollection _collection;
-    private readonly BangumiExtensionContext _context;
     private readonly CancellationToken _cancellationToken;
 
-    public UserSubjectCollectionListItem(BangumiExtensionContext context, UserSubjectCollection subjectCollection, CancellationToken cancellationToken)
+    public UserSubjectCollectionListItem(BangumiClient client, UserSubjectCollection subjectCollection, CancellationToken cancellationToken)
     {
+        _client = client;
         _collection = subjectCollection;
-        _context = context;
         _cancellationToken = cancellationToken;
         var subject = _collection.Subject;
 
@@ -44,17 +48,20 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
 
         Tags = [subject.Type.ToTag()];
 
-        SetDetails();
+        _ = SetDetailsAsync();
         _ = SetMoreCommandsAsync(_cancellationToken);
     }
 
     private Episode? _nextEp;
 
-    private void SetDetails()
+    private async Task SetDetailsAsync()
     {
         var subject = _collection.Subject;
 
-        Details = new Details
+        DetailsTags episodeDetailsData;
+
+        Details details;
+        Details = details = new Details
         {
             Title = subject.Name,
             HeroImage = new IconInfo(subject.Images.Grid),
@@ -66,6 +73,12 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
                         Key = "中文名",
                         Data = new DetailsLink{ Text = x }
                     }),
+                new DetailsElement{
+                    Key = "章节",
+                    Data = episodeDetailsData = new DetailsTags {
+                        Tags = [new Tag("Loading...")]
+                    },
+                },
                 new DetailsElement {
                     Key = "信息",
                     Data = new DetailsTags {
@@ -80,6 +93,25 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
                 },
             ]
         };
+
+        List<Tag> tags = [];
+        Episode? firstWatching = null;
+        var epcols = _client.GetUserSubjectEpisodeCollections(subject.Id);
+        await foreach (var epcol in epcols.WithCancellation(_cancellationToken)) {
+            var ep = epcol.Episode;
+            firstWatching ??= ep;
+            tags.Add(new Tag($"{ep.Sort}")
+            {
+                Background = epcol.Type is EpisodeCollectionType.Collect ? new OptionalColor(true, new Color(0, 0, 255, 255))
+                    : ep.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? new OptionalColor(true, new Color(0, 255, 255, 255))
+                    : default,
+                Foreground = epcol.Type is EpisodeCollectionType.Collect ? new OptionalColor(true, new Color(255, 255, 255, 255))
+                    : default,
+                ToolTip = ep.Name,
+            });
+        }
+        episodeDetailsData.Tags = tags.AsEnumerable<ITag>().ToArray();
+        details.Metadata = details.Metadata; // Force raise notification
     }
 
     private async Task SetMoreCommandsAsync(CancellationToken cancellationToken)
@@ -102,7 +134,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         var epCount = _collection.Subject.EpisodeCount;
         if (epCount == 0) {
             // wiki中没有值，从数据库获取
-            var fullsubject = await _context.Client.GetSubjectAsync(_collection.SubjectId, _cancellationToken).ConfigureAwait(false);
+            var fullsubject = await _client.GetSubjectAsync(_collection.SubjectId, _cancellationToken).ConfigureAwait(false);
             epCount = (int)fullsubject.TotalEpisodeCount;
         }
         if (_collection.EpisodeStatus < epCount) {
@@ -131,16 +163,16 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
             return;
 
         try {
-            await _context.Client.UpdateUserSubjectEpisodeCollectionsAsync(_collection.Subject.Id, new UpdateUserSubjectEpisodeCollectionsRequestBody
+            await _client.UpdateUserSubjectEpisodeCollectionsAsync(_collection.Subject.Id, new UpdateUserSubjectEpisodeCollectionsRequestBody
             {
                 EpisodeIds = [ep.Id],
                 Type = EpisodeCollectionType.Collect
             }).ConfigureAwait(false);
 
             // 重设collection
-            var self = await _context.Client.GetAuthorizationAsync(_cancellationToken).ConfigureAwait(false);
+            var self = await _client.GetAuthorizationAsync(_cancellationToken).ConfigureAwait(false);
             Debug.Assert(self is not null);
-            await ReplaceCollectionAsync(await _context.Client.GetUserSubjectCollectionAsync(self.UserName, _collection.SubjectId, _cancellationToken).ConfigureAwait(false));
+            await ReplaceCollectionAsync(await _client.GetUserSubjectCollectionAsync(self.UserName, _collection.SubjectId, _cancellationToken).ConfigureAwait(false));
         }
         catch {
             // TODO: 弹个toast？
@@ -161,7 +193,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
     private async void MarkSubjectAsDoneAsyncCallback()
     {
         try {
-            await _context.Client.UpdateUserSubjectCollectionAsync(_collection.SubjectId, new UpdateUserSubjectCollectionRequestBody
+            await _client.UpdateUserSubjectCollectionAsync(_collection.SubjectId, new UpdateUserSubjectCollectionRequestBody
             {
                 Type = SubjectCollectionType.Collect,
             }, _cancellationToken).ConfigureAwait(false);
@@ -175,9 +207,9 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
 
     private async Task<CommandContextItem?> GetOpenEpisodeUrlCommandItemAsync(CancellationToken cancellationToken)
     {
-        var prevEp = await _context.Client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
+        var prevEp = await _client.GetEpisodes(_collection.SubjectId).ElementAtOrDefaultAsync(_collection.EpisodeStatus - 1, _cancellationToken).ConfigureAwait(false);
         if (prevEp is not null) {
-            return new CommandContextItem(BangumiHelpers.OpenEpisodeUrlCommand(prevEp))
+            return new CommandContextItem(new OpenUrlCommand(BangumiHelpers.EpisodeUrl(prevEp)))
             {
                 Title = $"打开Ep.{prevEp.Sort}页面",
                 Subtitle = "",
@@ -199,7 +231,7 @@ internal sealed partial class UserSubjectCollectionListItem : ListItem
         if (_nextEp is not null)
             return _nextEp;
 
-        _nextEp = await _context.Client.GetEpisodes(_collection.SubjectId)
+        _nextEp = await _client.GetEpisodes(_collection.SubjectId)
             .ElementAtAsync(_collection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
 
         Debug.Assert(_nextEp is not null);

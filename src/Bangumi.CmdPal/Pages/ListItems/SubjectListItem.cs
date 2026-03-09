@@ -8,8 +8,7 @@ using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.CmdPal.Core;
-using Trarizon.Bangumi.CmdPal.Helpers;
-using Trarizon.Bangumi.CmdPal.Utilities;
+using Trarizon.Bangumi.CmdPal.Toolkit;
 using Trarizon.Library.Functional;
 
 namespace Trarizon.Bangumi.CmdPal.Pages.ListItems;
@@ -17,14 +16,14 @@ internal sealed partial class SubjectListItem : ListItem
 {
     private const int SummaryTruncateLength = 100;
 
-    private readonly BangumiExtensionContext _context;
+    private readonly BangumiClient _client;
     private readonly SearchResponsedSubject _subject;
     private readonly CancellationToken _cancellationToken;
 
-    public SubjectListItem(BangumiExtensionContext context, SearchResponsedSubject subject, CancellationToken cancellationToken)
+    public SubjectListItem(SearchResponsedSubject subject, BangumiClient client, CancellationToken cancellationToken)
     {
-        _context = context;
         _subject = subject;
+        _client = client;
         _cancellationToken = cancellationToken;
 
         Command = new OpenUrlCommand(BangumiHelpers.SubjectUrl(subject))
@@ -83,12 +82,12 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async Task SetMoreCommandsAsync(CancellationToken cancellationToken)
     {
-        var self = await _context.Client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
+        var self = await _client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
         if (self is null)
             return;
 
         try {
-            var collection = await _context.Client.GetUserSubjectCollectionAsync(self.UserName, _subject.Id, cancellationToken).ConfigureAwait(false);
+            var collection = await _client.GetUserSubjectCollectionAsync(self.UserName, _subject.Id, cancellationToken).ConfigureAwait(false);
             if (collection.Type is SubjectCollectionType.Wish) {
                 MoreCommands = [
                     new CommandContextItem("标记为在看",
@@ -124,7 +123,7 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async void MarkAsWishAsyncCallback()
     {
-        await _context.Client.AddOrUpdateUserSubjectCollectionAsync(_subject.Id, new()
+        await _client.AddOrUpdateUserSubjectCollectionAsync(_subject.Id, new()
         {
             Type = SubjectCollectionType.Wish
         }, _cancellationToken).ConfigureAwait(false);
@@ -132,7 +131,7 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async void MarkAsDoingAsyncCallback()
     {
-        await _context.Client.AddOrUpdateUserSubjectCollectionAsync(_subject.Id, new()
+        await _client.AddOrUpdateUserSubjectCollectionAsync(_subject.Id, new()
         {
             Type = SubjectCollectionType.Doing,
         }, _cancellationToken).ConfigureAwait(false);

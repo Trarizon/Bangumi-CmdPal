@@ -6,11 +6,8 @@ using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Extensions.Logging;
 using System;
-using System.IO;
 using Trarizon.Bangumi.CmdPal.Core;
-using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Pages;
-using ZLogger;
 
 namespace Trarizon.Bangumi.CmdPal;
 
@@ -19,9 +16,8 @@ public sealed partial class BangumiExtensionCommandsProvider : CommandProvider, 
     private static readonly SettingsManager _settingsManager = new();
 
     private readonly ICommandItem[] _commands;
-    private readonly MainPage _mainPage;
 
-    private readonly BangumiExtensionContext _context;
+    private readonly BangumiContext _context;
 
     public BangumiExtensionCommandsProvider()
     {
@@ -30,12 +26,13 @@ public sealed partial class BangumiExtensionCommandsProvider : CommandProvider, 
         Settings = _settingsManager.Settings;
         _context = new(_settingsManager);
         _commands = [
-            new CommandItem(_mainPage = new MainPage(_context)) {
+            new CommandItem(_context.BangumiPage)
+            {
                 Title = DisplayName,
                 Subtitle = "搜索、记录Bangumi条目信息",
-                MoreCommands = [
-                    new CommandContextItem(_settingsManager.Settings.SettingsPage)
-                ]
+                //MoreCommands = [
+                //    new CommandContextItem(_settingsManager.Settings.SettingsPage)
+                //]
             },
         ];
     }
@@ -48,7 +45,6 @@ public sealed partial class BangumiExtensionCommandsProvider : CommandProvider, 
     public override void Dispose()
     {
         base.Dispose();
-        _mainPage.Dispose();
         _context.Dispose();
     }
 }
