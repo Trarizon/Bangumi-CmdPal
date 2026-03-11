@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
@@ -9,6 +10,7 @@ using Trarizon.Bangumi.Api;
 using Trarizon.Bangumi.Api.Exceptions;
 using Trarizon.Bangumi.Api.Responses.Models.Users;
 using Trarizon.Bangumi.Api.Routes;
+using Trarizon.Bangumi.CmdPal.Core.Http;
 using Trarizon.Library.Functional;
 using ZLogger;
 
@@ -19,13 +21,15 @@ internal sealed partial class BangumiClient : IBangumiClient, IDisposable
     private const string UserAgent = "Trarizon/Trarizon.Bangumi.CommandPalette";
 
     private BangumiHttpClient _client;
+    private readonly IMemoryCache _cache;
     private readonly ILogger _logger;
     private Optional<UserSelf?> _self;
 
     public BangumiHttpClient Client => _client;
 
-    public BangumiClient(SettingsProvider settings, ILogger<BangumiClient> logger)
+    public BangumiClient(IMemoryCache cache, SettingsProvider settings, ILogger<BangumiClient> logger)
     {
+        _cache = cache;
         _logger = logger;
         _ = Reauthorize(settings.AccessToken);
         settings.PropertyChanged += async (s, e) =>
@@ -69,9 +73,34 @@ internal sealed partial class BangumiClient : IBangumiClient, IDisposable
         AuthorizationStatusChanged?.Invoke(_self);
     }
 
-    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
-        return _client.SendAsync(request, cancellationToken);
+        _logger.ZLogInformation($"Http Request {request.Method}:{request.RequestUri}");
+        if (request.Method != HttpMethod.Get || (request.RequestUri?.ToString().Contains("/users/") ?? false)) {
+            var dirResp = await _client.SendAsync(request, cancellationToken);
+            _logger.ZLogInformation($"Http Response [{dirResp.StatusCode}] {request.Method}:{request.RequestUri}");
+            return dirResp;
+        }
+
+        var key = $"bangumi-api-request_{request.Method}:{request.RequestUri}";
+        if (_cache.TryGetValue(key, out var respCache)) {
+            var cachedResp = ((HttpResponseCache)respCache!).ToResponseMessage();
+            _logger.ZLogInformation($"Http Response [Cached] [{cachedResp.StatusCode}] {request.Method}:{request.RequestUri}");
+            return cachedResp;
+        }
+
+        var resp = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (resp.IsSuccessStatusCode) {
+            _cache.Set(key, await HttpResponseCache.CreateAsync(resp).ConfigureAwait(false), new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4),
+                SlidingExpiration = TimeSpan.FromHours(1),
+            });
+        }
+
+        _logger.ZLogInformation($"Http Response [{resp.StatusCode}] {request.Method}:{request.RequestUri}");
+        return resp;
     }
 
     public async ValueTask<UserSelf?> GetAuthorizationAsync(CancellationToken cancellationToken = default)

@@ -102,7 +102,7 @@ internal partial class CollectionSearchPage : ArrayDynamicListPage, IDisposable
                 _logger.ZLogTrace($"Search empty done");
 
                 var result = collections.Datas
-                    .Select(col => new UserSubjectCollectionListItem(_client, col, cancellationToken))
+                    .Select(col => new SubjectListItem(col, _client, _logger, cancellationToken))
                     .ToArray();
                 SetItems(result, NoResultCommandItem);
                 return;
@@ -116,7 +116,7 @@ internal partial class CollectionSearchPage : ArrayDynamicListPage, IDisposable
                             || x.Subject.ChineseName.Contains(searchText, StringComparison.OrdinalIgnoreCase);
                     })
                     .Take(_settings.SearchCount)
-                    .Select(col => new UserSubjectCollectionListItem(_client, col, cancellationToken))
+                    .Select(col => new SubjectListItem(col, _client, _logger, cancellationToken))
                     .ToArrayAsync(cancellationToken).ConfigureAwait(false);
 
                 SetItems(result, NoResultCommandItem);

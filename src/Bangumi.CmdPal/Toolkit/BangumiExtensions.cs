@@ -49,7 +49,7 @@ internal static class BangumiExtensions
             _ => throw new SwitchExpressionException(subjectType),
         };
 
-        public IconInfo GetIconInfo() => subjectType switch
+        public IconInfo ToIconInfo() => subjectType switch
         {
             SubjectType_All => IconInfo.FromCode("\uE71D"),
             SubjectType.Book => IconInfo.FromCode("\uE82D"),
@@ -64,7 +64,7 @@ internal static class BangumiExtensions
         {
             ref var val = ref CollectionsMarshal.GetValueRefOrAddDefault(_subjectTypeTagDict, subjectType, out bool exists);
             if (!exists) {
-                val = new Tag(subjectType.ToDisplayString()) { Icon = subjectType.GetIconInfo() };
+                val = new Tag(subjectType.ToDisplayString()) { Icon = subjectType.ToIconInfo() };
             }
             return val!;
         }

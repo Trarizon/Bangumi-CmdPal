@@ -53,37 +53,37 @@ internal sealed partial class SearchPage : ArrayDynamicListPage, IDisposable
             {
                 Id = SubjectType.All.ToFilterId(),
                 Name = SubjectType.All.ToDisplayString(),
-                Icon = SubjectType.All.GetIconInfo(),
+                Icon = SubjectType.All.ToIconInfo(),
             },
             new Filter
             {
                 Id = SubjectType.Anime.ToFilterId(),
                 Name = SubjectType.Anime.ToDisplayString(),
-                Icon = SubjectType.Anime.GetIconInfo(),
+                Icon = SubjectType.Anime.ToIconInfo(),
             },
             new Filter
             {
                 Id = SubjectType.Book.ToFilterId(),
                 Name = SubjectType.Book.ToDisplayString(),
-                Icon = SubjectType.Book.GetIconInfo(),
+                Icon = SubjectType.Book.ToIconInfo(),
             },
             new Filter
             {
                 Id = SubjectType.Game.ToFilterId(),
                 Name = SubjectType.Game.ToDisplayString(),
-                Icon = SubjectType.Game.GetIconInfo(),
+                Icon = SubjectType.Game.ToIconInfo(),
             },
             new Filter
             {
                 Id = SubjectType.Music.ToFilterId(),
                 Name = SubjectType.Music.ToDisplayString(),
-                Icon = SubjectType.Music.GetIconInfo(),
+                Icon = SubjectType.Music.ToIconInfo(),
             },
             new Filter
             {
                 Id = SubjectType.Real.ToFilterId(),
                 Name = SubjectType.Real.ToDisplayString(),
-                Icon = SubjectType.Real.GetIconInfo(),
+                Icon = SubjectType.Real.ToIconInfo(),
             }
         ]);
         Filters = filters;
@@ -112,6 +112,7 @@ internal sealed partial class SearchPage : ArrayDynamicListPage, IDisposable
             SetItems([], SearchHintResult);
             return;
         }
+        _searchHintListItem.Title = $"搜索条目：{newSearch}";
         SetItems([_searchHintListItem]);
     }
 
@@ -142,14 +143,14 @@ internal sealed partial class SearchPage : ArrayDynamicListPage, IDisposable
 
             var result = await _client.Client.SearchPagedSubjectsAsync(
                 new() { Keyword = searchText, Filter = new() { Types = SubjectType.FromFilterId(Filters?.CurrentFilterId) is var t && t == SubjectType.All ? [] : [t] } },
-                new Pagination(_settings.SearchCount, 0),
+                new Pagination(_settings.SearchCount, isFirst ? 0 : Items.Length),
                 cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
 
             _logger.ZLogInformation($"Search '{searchText}' filter '{Filters?.CurrentFilterId}' get {result.Offset}+{result.Datas.Length}/{result.Total} results");
 
-            SetItems([.. isFirst ? [] : Items, .. result.Datas.Select(x => new SubjectListItem(x, _client, cancellationToken))],
+            SetItems([.. isFirst ? [] : Items, .. result.Datas.Select(x => new SubjectListItem(x, _client, _logger, cancellationToken))],
                 _emptyResult,
                 result.Total > Items.Length + result.Datas.Length);
         }

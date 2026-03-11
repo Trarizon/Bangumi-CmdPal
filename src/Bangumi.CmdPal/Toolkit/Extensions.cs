@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Trarizon.Library.Functional;
 using ZLogger;
 
@@ -31,5 +33,25 @@ internal static class Extensions
         if (end > source.Length)
             throw new ArgumentException("Slice should be part of source", nameof(slice));
         return (int)start..(int)end;
+    }
+
+    public static void AddOptional<T>(this List<T> list, Optional<T> item)
+    {
+        if (item.TryGetValue(out var value)) {
+            list.Add(value);
+        }
+    }
+
+    extension(Result)
+    {
+        public static async Task<Result<T, Exception>> TryTask<T>(Task<T> task)
+        {
+            try {
+                return await task.ConfigureAwait(false);
+            }
+            catch (Exception ex) {
+                return ex;
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@ namespace Trarizon.Bangumi.CmdPal.Core;
 internal sealed partial class BangumiContext(SettingsManager settings) : IDisposable
 {
     public SettingsProvider Settings { get; } = new SettingsProvider(settings);
-    public BangumiClient Client => field ??= new BangumiClient(Settings, LoggerFactory.CreateLogger<BangumiClient>());
+    public BangumiClient Client => field ??= new BangumiClient(Cache, Settings, LoggerFactory.CreateLogger<BangumiClient>());
     public ILoggerFactory LoggerFactory => field ??= Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
     {
 #if DEBUG
