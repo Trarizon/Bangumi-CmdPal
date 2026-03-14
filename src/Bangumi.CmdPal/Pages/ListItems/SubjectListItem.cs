@@ -29,7 +29,6 @@ internal sealed partial class SubjectListItem : ListItem
     private readonly ILogger _logger;
 
     private readonly ISubject _subject;
-    private UserSubjectCollection? _subjectCollection;
     private Subject? _fullSubject;
     private readonly CancellationToken _cancellationToken;
     private bool _requesting;
@@ -48,19 +47,6 @@ internal sealed partial class SubjectListItem : ListItem
         }
         set => base.Details = value;
     }
-
-    private bool _moreCommandsAsyncInit;
-    public override IContextItem[] MoreCommands
-    {
-        get {
-            if (!Interlocked.CompareExchange(ref _moreCommandsAsyncInit, true, false)) {
-                InitAuthedMoreCommandsInfoAsync().ContinueWith(t => OnPropertyChanged(nameof(MoreCommands)));
-            }
-            return base.MoreCommands;
-        }
-        set => base.MoreCommands = value;
-    }
-
 
 
     private SubjectListItem(ISubject subject, BangumiClient client, ILogger logger, CancellationToken cancellationToken)
@@ -130,12 +116,17 @@ internal sealed partial class SubjectListItem : ListItem
         Details = _details;
 
         _logger.ZLogInformation($"Subject item '{_subject.Name}' inited.");
+
+        if (client.AuthorizedUser.TryGetValue(out var user)) {
+            _ = FetchSubjectCollectionAsync(cancellationToken);
+            MoreCommands = MoreCommandsPlaceHolder;
+        }
     }
 
     public SubjectListItem(UserSubjectCollection subjectCollection, BangumiClient client, ILogger logger, CancellationToken cancellationToken)
         : this((ISubject)subjectCollection.Subject, client, logger, cancellationToken)
     {
-        _subjectCollection = subjectCollection;
+        SubjectCollection = subjectCollection;
         var subject = subjectCollection.Subject;
 
         var nameMd = Optional.Of(subject.ChineseName)
@@ -167,31 +158,57 @@ internal sealed partial class SubjectListItem : ListItem
         Details = _details;
 
         _logger.ZLogInformation($"Subject item '{_subject.Name}' inited.");
+
+        _ = FetchSubjectCollectionAsync(cancellationToken);
+        MoreCommands = MoreCommandsPlaceHolder;
     }
 
-    private Task<UserSubjectCollection>? _colTask;
-    private async ValueTask<Optional<UserSubjectCollection>> GetUserSubjectCollectionAsync(string userName)
+    public UserSubjectCollection? SubjectCollection
     {
-        if (_subjectCollection is not null)
-            return _subjectCollection;
+        get;
+        set {
+            if (field != value) {
+                field = value;
+                OnSubjectCollectionChanged(field);
+            }
+        }
+    }
 
-        try {
-            var res = await (_colTask ??= _client.Client.GetUserSubjectCollectionAsync(userName, _subject.Id, _cancellationToken)).ConfigureAwait(false);
-            _subjectCollection = res;
-            return res;
+    private DetailsElement? _episodesDetailsElement;
+
+    private Optional<UserSubjectCollection?> _subjectCollection;
+    private Task<UserSubjectCollection>? _subjectCollectionTask;
+    private DetailsElement? _subjectCollectionDetailsElement;
+    private CancellationTokenSource? _subjectCollectionCancellationTokenSource;
+
+    private void RefreshDetails()
+    {
+        _details.Metadata = [
+            .. _metadatas,
+            .. Optional.OfNotNull(_episodesDetailsElement),
+            .. Optional.OfNotNull(_subjectCollectionDetailsElement)
+        ];
+        OnPropertyChanged(nameof(Details));
+    }
+
+    private async Task FetchSubjectCollectionAsync(CancellationToken cancellationToken)
+    {
+        if (!_client.AuthorizedUser.OfNotNull().TryGetValue(out var user)) {
+            SubjectCollection = null;
+            return;
         }
-        catch (BangumiApiException e) when (e.HttpStatusCode is HttpStatusCode.NotFound) {
-            return default;
-        }
+
+        var result = await Result.TryTask(_subjectCollectionTask ??= _client.Client.GetUserSubjectCollectionAsync(user.UserName, _subject.Id, cancellationToken)).ConfigureAwait(false);
+        _subjectCollectionTask = null;
+        SubjectCollection = result.GetValueOrDefault();
     }
 
     private async Task InitAuthedDetailsInfoAsync()
     {
         if (_client.AuthorizedUser.OfNotNull().TryGetValue(out var user)) {
             try {
-                Optional<DetailsElement> episodeMd = default;
                 if (_subject.Type == SubjectType.Anime) {
-                    episodeMd = new DetailsElement
+                    _episodesDetailsElement = new DetailsElement
                     {
                         Key = "章节",
                         Data = new DetailsTags
@@ -205,30 +222,16 @@ internal sealed partial class SubjectListItem : ListItem
                                     Foreground = x.Type is EpisodeCollectionType.Collect ? new OptionalColor(true, new Color(255, 255, 255, 255))
                                         : x.Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? new OptionalColor(true, new Color(0, 102, 206, 255))
                                         : default,
-                                    ToolTip = x.Episode.Name
+                                    ToolTip = x.Episode.AirDate is null ? x.Episode.Name : $"{x.Episode.AirDate.Value:yy-MM-dd}\n{x.Episode.Name}"
                                 })
                                 .ToArrayAsync(_cancellationToken).ConfigureAwait(false),
                         }
                     };
                 }
-
-                var colres = await GetUserSubjectCollectionAsync(user.UserName).ConfigureAwait(false);
-                if (colres.TryGetValue(out var col)) {
-                    _subjectCollection = col;
-                    var userMd = new DetailsElement
-                    {
-                        Key = "用户数据",
-                        Data = new DetailsTags
-                        {
-                            Tags = [
-                                new Tag(col.Type.ToDisplayString(col.SubjectType)),
-                                .. Optional.Of(col.Rate).Where(x => x > 0)
-                                    .Select(x => new Tag($"我的给分: {x}")),
-                            ]
-                        }
-                    };
-                    _details.Metadata = [.. _metadatas, .. episodeMd, userMd];
+                else {
+                    _episodesDetailsElement = null;
                 }
+                RefreshDetails();
             }
             catch (Exception ex) {
                 _logger.ZLogError($"Subject item '{_subject.Name}' authed init failed. {ex.Message} {ex.StackTrace}");
@@ -240,58 +243,6 @@ internal sealed partial class SubjectListItem : ListItem
 
 
     private static readonly CommandContextItem[] MoreCommandsPlaceHolder = [new CommandContextItem(new NoOpCommand() { Name = "Loading commands..." }) { Title = "Loading commands..." }];
-    private async Task InitAuthedMoreCommandsInfoAsync()
-    {
-        if (_client.AuthorizedUser.OfNotNull().TryGetValue(out var user)) {
-            MoreCommands = MoreCommandsPlaceHolder;
-            try {
-                var colres = await GetUserSubjectCollectionAsync(user.UserName).ConfigureAwait(false);
-
-                if (colres.TryGetValue(out var col)) {
-                    MoreCommands = col.Type switch
-                    {
-                        SubjectCollectionType.Wish => [
-                            new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback)
-                            {
-                                Name = "标记为" + SubjectCollectionType.Doing.ToDisplayString(_subject.Type),
-                            })
-                        ],
-                        SubjectCollectionType.Doing => [
-                            ..Optional.OfNotNull(await GetMarkNextEpisodeDoneItemAsync(_cancellationToken).ConfigureAwait(false)),
-                            new CommandContextItem(new RequestCommand(this, MarkAsDoneAsyncCallback)
-                            {
-                                Name = "标记为" + SubjectCollectionType.Collect.ToDisplayString(_subject.Type),
-                            }),
-                            ..Optional.OfNotNull(await GetOpenEpisodeUrlCommandItemAsync(_cancellationToken).ConfigureAwait(false)),
-                        ],
-                        SubjectCollectionType.OnHold => [],
-                        SubjectCollectionType.Collect => [],
-                        SubjectCollectionType.Dropped => [],
-                        _ => [],
-                    };
-                }
-                else {
-                    MoreCommands = [
-                        new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback)
-                        {
-                            Name = $"标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}",
-                        }),
-                        new CommandContextItem(new RequestCommand(this, MarkAsWishAsyncCallback)
-                        {
-                            Name = $"标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}",
-                        }),
-                    ];
-                }
-            }
-            catch (Exception ex) {
-                MoreCommands = [];
-                _logger.ZLogError($"Subject item '{_subject.Name}' async inited failed. {ex.Message} {ex.StackTrace}");
-                throw;
-            }
-            _logger.ZLogInformation($"Subject item '{_subject.Name}' async inited.");
-        }
-
-    }
 
     private async Task MarkAsWishAsyncCallback()
     {
@@ -323,22 +274,22 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async Task<CommandContextItem?> GetMarkNextEpisodeDoneItemAsync(CancellationToken cancellationToken)
     {
-        if (_subjectCollection is null)
+        if (SubjectCollection is null)
             return null;
 
-        var epCount = _subjectCollection.Subject.EpisodeCount;
+        var epCount = SubjectCollection.Subject.EpisodeCount;
         if (epCount == 0) {
             // wiki中没有值，从数据库获取
-            _fullSubject ??= await _client.GetSubjectAsync(_subjectCollection.SubjectId, cancellationToken).ConfigureAwait(false);
+            _fullSubject ??= await _client.GetSubjectAsync(SubjectCollection.SubjectId, cancellationToken).ConfigureAwait(false);
             epCount = (int)_fullSubject.TotalEpisodeCount;
         }
-        if (_subjectCollection.EpisodeStatus < epCount) {
-            var nextEp = await GetNextEpisodeAsync(_subjectCollection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
+        if (SubjectCollection.EpisodeStatus < epCount) {
+            var nextEp = await GetEpisodeAsync(SubjectCollection.EpisodeStatus, cancellationToken).ConfigureAwait(false);
             if (nextEp is null)
                 return null;
             var epName = nextEp.Name.Length > EpNameTruncateLength ? $"{nextEp.Name.AsSpan(..EpNameTruncateLength)}..." : nextEp.Name;
             var text = $"看过 ep.{nextEp.Sort} {epName}";
-            return new CommandContextItem(new RequestCommand(this, MarkNextEpisodeDoneAsyncCallback)
+            return new CommandContextItem(new RequestCommand(this, MarkNextEpisodeDoneAsyncCallback, $"正在标记 ep.{nextEp.Sort} {epName} 为看过")
             {
                 Name = text,
             });
@@ -348,28 +299,29 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async Task MarkNextEpisodeDoneAsyncCallback()
     {
-        if (_subjectCollection is null)
+        if (SubjectCollection is null)
             return;
 
-        var ep = await GetNextEpisodeAsync(_subjectCollection.EpisodeStatus, _cancellationToken).ConfigureAwait(false);
+        var ep = await GetEpisodeAsync(SubjectCollection.EpisodeStatus, _cancellationToken).ConfigureAwait(false);
         if (ep is null)
             return;
 
-        await _client.UpdateUserSubjectEpisodeCollectionsAsync(_subjectCollection.Subject.Id, new UpdateUserSubjectEpisodeCollectionsRequestBody
+        await _client.UpdateUserSubjectEpisodeCollectionsAsync(SubjectCollection.Subject.Id, new UpdateUserSubjectEpisodeCollectionsRequestBody
         {
             EpisodeIds = [ep.Id],
             Type = EpisodeCollectionType.Collect
         }).ConfigureAwait(false);
 
+
         // 重设collection
-        await InitAuthedMoreCommandsInfoAsync();
+        await FetchSubjectCollectionAsync(_cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<CommandContextItem?> GetOpenEpisodeUrlCommandItemAsync(CancellationToken cancellationToken)
     {
-        if (_subjectCollection is null)
+        if (SubjectCollection is null)
             return null;
-        var prevEp = await GetNextEpisodeAsync(int.Max(0, _subjectCollection.EpisodeStatus - 1), cancellationToken).ConfigureAwait(false);
+        var prevEp = await GetEpisodeAsync(int.Max(0, SubjectCollection.EpisodeStatus - 1), cancellationToken).ConfigureAwait(false);
         if (prevEp is null)
             return null;
         return new CommandContextItem(new OpenUrlCommand(BangumiHelpers.EpisodeUrl(prevEp))
@@ -378,13 +330,69 @@ internal sealed partial class SubjectListItem : ListItem
         });
     }
 
-    private async ValueTask<Episode?> GetNextEpisodeAsync(int idx, CancellationToken cancellationToken)
+    private async ValueTask<Episode?> GetEpisodeAsync(int idx, CancellationToken cancellationToken)
     {
         var data = await _client.GetPagedEpisodesAsync(_subject.Id, pagination: new(1, idx), cancellationToken: cancellationToken).ConfigureAwait(false);
         return data.Datas.ElementAtOrDefault(0);
     }
 
-    private sealed partial class RequestCommand(SubjectListItem item, Func<Task> func) : InvokableCommand
+    private async void OnSubjectCollectionChanged(UserSubjectCollection? collection)
+    {
+        if (collection is null)
+            return;
+
+        _subjectCollectionDetailsElement = new DetailsElement
+        {
+            Key = "用户数据",
+            Data = new DetailsTags
+            {
+                Tags = [
+                    new Tag(collection.Type.ToDisplayString(collection.SubjectType)),
+                    .. Optional.Of(collection.Rate).Where(x => x > 0)
+                        .Select(x => new Tag($"我的给分: {x}")),
+                ]
+            }
+        };
+        RefreshDetails();
+
+        if (collection is null) {
+            MoreCommands = [
+                new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback, $"正在标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}")
+                {
+                    Name = $"标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}",
+                }),
+                new CommandContextItem(new RequestCommand(this, MarkAsWishAsyncCallback, $"正在标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}")
+                {
+                    Name = $"标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}",
+                }),
+            ];
+        }
+        else {
+            MoreCommands = collection.Type switch
+            {
+                SubjectCollectionType.Wish => [
+                    new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback, "正在标记为" + SubjectCollectionType.Doing.ToDisplayString(_subject.Type) )
+                    {
+                        Name = "标记为" + SubjectCollectionType.Doing.ToDisplayString(_subject.Type),
+                    })
+                ],
+                SubjectCollectionType.Doing => [
+                    ..Optional.OfNotNull(await GetMarkNextEpisodeDoneItemAsync(_cancellationToken).ConfigureAwait(false)),
+                    new CommandContextItem(new RequestCommand(this, MarkAsDoneAsyncCallback, "正在标记为" + SubjectCollectionType.Collect.ToDisplayString(_subject.Type))
+                    {
+                        Name = "标记为" + SubjectCollectionType.Collect.ToDisplayString(_subject.Type),
+                    }),
+                    ..Optional.OfNotNull(await GetOpenEpisodeUrlCommandItemAsync(_cancellationToken).ConfigureAwait(false)),
+                ],
+                SubjectCollectionType.OnHold => [],
+                SubjectCollectionType.Collect => [],
+                SubjectCollectionType.Dropped => [],
+                _ => [],
+            };
+        }
+    }
+
+    private sealed partial class RequestCommand(SubjectListItem item, Func<Task> func, string? toastMessage = null) : InvokableCommand
     {
         public override ICommandResult Invoke()
         {
@@ -401,7 +409,17 @@ internal sealed partial class SubjectListItem : ListItem
                     Interlocked.Exchange(ref item._requesting, false);
                 }
             });
-            return CommandResult.KeepOpen();
+
+            if (toastMessage is null) {
+                return CommandResult.KeepOpen();
+            }
+            else {
+                return CommandResult.ShowToast(new ToastArgs
+                {
+                    Message = toastMessage,
+                    Result = CommandResult.KeepOpen()
+                });
+            }
         }
     }
 }
