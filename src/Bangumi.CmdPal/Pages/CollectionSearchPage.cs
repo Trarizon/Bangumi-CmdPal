@@ -9,7 +9,6 @@ using Trarizon.Bangumi.Api.Responses.Models.Collections;
 using Trarizon.Bangumi.Api.Routes;
 using Trarizon.Bangumi.Api.Toolkit;
 using Trarizon.Bangumi.CmdPal.Core;
-using Trarizon.Bangumi.CmdPal.Helpers;
 using Trarizon.Bangumi.CmdPal.Pages.ListItems;
 using Trarizon.Bangumi.CmdPal.Toolkit;
 using ZLogger;

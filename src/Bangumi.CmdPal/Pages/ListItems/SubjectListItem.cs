@@ -2,12 +2,9 @@
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Trarizon.Bangumi.Api.Exceptions;
 using Trarizon.Bangumi.Api.Requests.Payloads;
 using Trarizon.Bangumi.Api.Responses.Models;
 using Trarizon.Bangumi.Api.Responses.Models.Abstractions;
@@ -34,7 +31,7 @@ internal sealed partial class SubjectListItem : ListItem
     private bool _requesting;
 
     private Details _details;
-    private IDetailsElement[] _metadatas;
+    private readonly IDetailsElement[] _metadatas;
 
     private bool _detailsAsyncInit;
     public override IDetails? Details
@@ -126,7 +123,6 @@ internal sealed partial class SubjectListItem : ListItem
     public SubjectListItem(UserSubjectCollection subjectCollection, BangumiClient client, ILogger logger, CancellationToken cancellationToken)
         : this((ISubject)subjectCollection.Subject, client, logger, cancellationToken)
     {
-        SubjectCollection = subjectCollection;
         var subject = subjectCollection.Subject;
 
         var nameMd = Optional.Of(subject.ChineseName)
@@ -159,27 +155,22 @@ internal sealed partial class SubjectListItem : ListItem
 
         _logger.ZLogInformation($"Subject item '{_subject.Name}' inited.");
 
-        _ = FetchSubjectCollectionAsync(cancellationToken);
         MoreCommands = MoreCommandsPlaceHolder;
+
+        SubjectColInternal = subjectCollection;
     }
 
-    public UserSubjectCollection? SubjectCollection
+    private Optional<UserSubjectCollection?> SubjectColInternal
     {
         get;
-        set {
-            if (field != value) {
-                field = value;
-                OnSubjectCollectionChanged(field);
-            }
-        }
+        set { if (field != value) { field = value; OnSubjectCollectionChanged(field.GetValueOrDefault()); } }
     }
+    public UserSubjectCollection? SubjectCollection => SubjectColInternal.GetValueOrDefault();
 
     private DetailsElement? _episodesDetailsElement;
 
-    private Optional<UserSubjectCollection?> _subjectCollection;
     private Task<UserSubjectCollection>? _subjectCollectionTask;
     private DetailsElement? _subjectCollectionDetailsElement;
-    private CancellationTokenSource? _subjectCollectionCancellationTokenSource;
 
     private void RefreshDetails()
     {
@@ -194,13 +185,13 @@ internal sealed partial class SubjectListItem : ListItem
     private async Task FetchSubjectCollectionAsync(CancellationToken cancellationToken)
     {
         if (!_client.AuthorizedUser.OfNotNull().TryGetValue(out var user)) {
-            SubjectCollection = null;
+            SubjectColInternal = null;
             return;
         }
 
         var result = await Result.TryTask(_subjectCollectionTask ??= _client.Client.GetUserSubjectCollectionAsync(user.UserName, _subject.Id, cancellationToken)).ConfigureAwait(false);
         _subjectCollectionTask = null;
-        SubjectCollection = result.GetValueOrDefault();
+        SubjectColInternal = result.GetValueOrDefault();
     }
 
     private async Task InitAuthedDetailsInfoAsync()
@@ -338,8 +329,21 @@ internal sealed partial class SubjectListItem : ListItem
 
     private async void OnSubjectCollectionChanged(UserSubjectCollection? collection)
     {
-        if (collection is null)
+        if (collection is null) {
+            if (!_client.AuthorizedUser.OfNotNull().HasValue)
+                return;
+            MoreCommands = [
+                new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback, $"正在标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}")
+                {
+                    Name = $"标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}",
+                }),
+                new CommandContextItem(new RequestCommand(this, MarkAsWishAsyncCallback, $"正在标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}")
+                {
+                    Name = $"标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}",
+                }),
+            ];
             return;
+        }
 
         _subjectCollectionDetailsElement = new DetailsElement
         {
@@ -355,19 +359,7 @@ internal sealed partial class SubjectListItem : ListItem
         };
         RefreshDetails();
 
-        if (collection is null) {
-            MoreCommands = [
-                new CommandContextItem(new RequestCommand(this, MarkAsDoingAsyncCallback, $"正在标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}")
-                {
-                    Name = $"标记为{SubjectCollectionType.Doing.ToDisplayString(_subject.Type)}",
-                }),
-                new CommandContextItem(new RequestCommand(this, MarkAsWishAsyncCallback, $"正在标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}")
-                {
-                    Name = $"标记为{SubjectCollectionType.Wish.ToDisplayString(_subject.Type)}",
-                }),
-            ];
-        }
-        else {
+        if (_client.AuthorizedUser.HasValue) {
             MoreCommands = collection.Type switch
             {
                 SubjectCollectionType.Wish => [
